@@ -1,4 +1,4 @@
-## 1.ECMAScript262中数据类型的标准定义
+## 1. ECMAScript262中数据类型的标准定义
 
 > **4.2 ECMAScript Overview**
 > ECMAScript is object-based: basic language and host facilities are provided by objects, and an ECMAScript program is a cluster of communicating objects. In ECMAScript, an object is a collection of zero or more properties each with attributes that determine how each property can be used—for example, when the Writable attribute for a property is set to false, any attempt by executed ECMAScript code to assign a different value to the property fails. Properties are containers that hold other objects, primitive values, or functions. A primitive value is a member of one of the following built-in types: Undefined, Null, Boolean, Number, String, and Symbol; an object is a member of the built-in type Object; and a function is a callable object. A function that is associated with an object via a property is called a method.
@@ -20,7 +20,7 @@
   - 非标准特殊对象 Number String Boolean
   - 可调用/执行对象 function
   
-## 2.typeof数据类型检测的底层机制
+## 2. typeof数据类型检测的底层机制
 - 特点1: 返回的结果是字符串，字符串中包含了对应的数据类型
   - ```js 
     typeof typeof typeof [1,2,3] //'string' 
@@ -62,7 +62,7 @@
       // })();
       // utils.xxx();
      ```
-## 3.JS底层存储机制:堆(Heap)、栈(Stack)内存
+## 3. JS底层存储机制:堆(Heap)、栈(Stack)内存
 - 以下代码作为运行示例
 ```js
 var a = 12;        //window.a = 13
@@ -98,8 +98,8 @@ console.log(b);      //  { n:1,x:{ n:2 } }
 
 ![](../image/V8底层运行机制_EC_VO_GO（2）.png)
 
-## 4.数据类型解读之 number、Symobol、BigInt
-### 数字类型 number
+## 4. 数据类型解读之 number、Symobol、BigInt
+### 4.1 数字类型 number
 - 整数、浮点数(小数)、正数、负数、零
 - NaN: not a number 不是一个有效数字，但是它率属于number类型
   - `typeof NaN => 'number'`
@@ -119,7 +119,7 @@ console.log(b);      //  { n:1,x:{ n:2 } }
     }
     ```
 - Infinity 无穷大的值
-### Bigint
+### 4.2 Bigint
 - Bigint 大数
   - JS中最大/最小的安全数字：`Number.MAX_SAFE_INTEGER / Number.MIN_SAFE_INTEGER/Math.pow(2,53) - 1`
   - `9007199254740991 -9007199254740991 16位`
@@ -138,7 +138,7 @@ console.log(b);      //  { n:1,x:{ n:2 } }
   //一个数字后面加“n”就是BigInt
   //计算完成的超长结果，基于toString转换为字符串【会去掉n】,把这个值再传递给服务器即可
   ```
-### Symbol
+### 4.3 Symbol
 - Symbol唯一值类型
   - `Symbol() //创造一个唯一值
      Symnol('xxx') //创造一个唯一值，只不过设置了标记
@@ -173,8 +173,8 @@ console.log(b);      //  { n:1,x:{ n:2 } }
     console.log(obj[key]);//400
     console.log(obj[0]);//100 -> obj['0']
     ```
-## 数据类型转换
-### 把其他数据类型转换为number
+## 5. 数据类型转换
+### 5.1 把其他数据类型转换为number
 - `Number([val])`
   - 一般用于浏览器的隐式转换中
   - 规则：
@@ -217,5 +217,107 @@ parseInt传递的第二个值是一个radix进制
 */
 console.log(arr) // [27, NaN, 1, 1, 27]
 ```  
-### 把其他类型转换为布尔
+### 5.2 把其它类型转换为布尔
 - 除了0/NaN/空字符串/null/undefined五个值是false,其余都是true
+### 5.3 把其它类型转换为string
+- `[val].toString() & String([val])`
+  - 原始值类型：基于引号包起来，bigint会去掉n
+  - 对象类型的值：
+    - 调用Symbol.toPrimitive
+    - 如果不存在则继续调用valueOf获取原始值,有原始值则把其转换为字符串
+    - 如果不是原始值，则调用toString转换为字符串
+    - 特殊：普通对象转换为字符串是'[object Object]' -> Object.prototype.toString  
+- "+"代表的字符串拼接
+  - 有两边，一边是字符串,则会变为字符串拼接
+  - 有两边， 一边是对象，按照Symbol.toPrimitive -> valueOf ->toString  处理，变为字符串后，就直接按照字符串拼接处理了
+    - 特殊情况：`{} + 10` -> 10 {}会被认为是代码块处理的只是+10这个操作
+  - +只出现在左边 eg: +[val] 这是把val转换为数字   ++i(先累加在运算) & i++(先运算再累加)
+  - ```js
+    let result = 100 + true + 21.2 + null + undefined + 'Tencent' + [] + null + 9 + false;
+    // 100 + true + 21.2 + null  122.2
+    // 122.2 + undefined  NaN
+    //  NaN + 'Tencent'   'NaNTencent' 
+    //  'NaNTencent' + [] + null + 9 + false  'NaNTencentnull9false'
+    console.log(result) //'NaNTencentnull9false'
+    ```
+### 5.4 '=='比较的时候相互转换的规则
+- '==' 相等，两边数据类型不同，需要转换为相同类型，然后进行比较
+  - 对象 == 字符串 对象转换为字符串 Symobol.toPrimitive -> valueOf -> toString
+  - null == undefined -> true null/undefined和其他任何值都不相等
+  null === undefined -> false
+  - 对象 == 对象 比较的是堆内存地址，地址相同则相等
+  - NaN !== NaN
+  - 除了以上情况，只要两边类型不一致，剩下的都是转换为数字，然后再进行比较
+- '==='绝对相等，如果两边的类型不同，则直接是false,不会转换数据类型
+```js
+obj[Symbol.toPrimitive] = function(hint) {
+  // hint:number / string /default 浏览器自己调用这个方法的时候 会默认的实参值
+}
+
+console.log([] == false); //true
+//[] -> Symbol.toPrimitive()/undefined  valueOf()/[]  toString/'' -> 0
+// false -> 0  0 == 0 true
+var a = ?
+if (a == 1 && a == 2 && a == 3){
+  console.log('ok')
+}
+/*
+'=='比较：数据类型转换的机制，需要把a转换为数字
+因为把对象转换为数字，我们可以做的事很多 Symbol.toPrimitive -> valueOf -> toString -> Number
+
+var a = {
+  i:0,
+  //还可以重写valueOf和toString
+  [Symbol.toPrimitive](){
+    return ++this.i
+  }
+} 
+---------
+var a = [1, 2, 3]
+a.toString = a.shift
+
+全局上下文中
+基于var声明的变量是给GO（window）设置的一个属性
+获取属性a的值：Object.defineProperty进行数据劫持
+var i = 0
+Object.defineProperty(window, 'a', {
+  get(){
+    return ++i
+  }
+})
+*/
+``` 
+## 6. JS'骚'操作之0.1 + 0.2 !== 0.3
+- 十进制转换为二进制的计算 [val].toString(2)   // 参数是进制 范围 2~36
+  - 整数部分 除二取余
+  - 小数部分 乘二取整
+- JS使用number类型表示数字（整数和浮点数），遵循IEEE-754 标准 通过64位二进制值来表示一个数字https://babbage.cs.qc.cuny.eduIEEE-754.old/Decimal.html
+  - 第0位：符号位，0表示正数，1表示负数 S
+    第1位到第11位「11位指数」：储存指数部分 E
+    第12位到第63位「52位尾数」：储存小数部分（即有效数字）F
+    注：尾数部分在规约形式下第一位默认为1（省略不写）
+- 最大安全数字「16位」 Number.MAX_SAFE_INTEGER === Math.pow(2,53)-1
+- 怎么解决精度问题？
+  - 将数字转成整数【扩大系数】
+  - 第三方库：Math.js、 decimal.js、 big.js
+面试题：自己编写程序，把十进制的'整数'转换为二进制
+```js
+// decimal十进制数
+// binary 二进制
+// negative 负数
+// integer整数
+const decimal2binary = function decimal2binary(decimal){
+  let binary = [],
+      negative = decimal < 0,
+      integer;
+  decimal = Math.abs(decimal)
+  integer = Math.floor(decimal / 2)
+  binary.unshift(decimal % 2)
+  while(integer){
+     binary.unshift(decimal % 2)
+     integer = Math.floor(decimal / 2)
+  }
+  return `${negative?'-':''}${binary.join('')}`     
+}
+
+```
