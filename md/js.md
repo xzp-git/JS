@@ -216,7 +216,7 @@ parseInt传递的第二个值是一个radix进制
   + 把其它进制的值转换为10进制：‘按权展开求和’
 */
 console.log(arr) // [27, NaN, 1, 1, 27]
-```  
+```
 ### 5.2 把其它类型转换为布尔
 - 除了0/NaN/空字符串/null/undefined五个值是false,其余都是true
 ### 5.3 把其它类型转换为string
@@ -230,7 +230,8 @@ console.log(arr) // [27, NaN, 1, 1, 27]
 - "+"代表的字符串拼接
   - 有两边，一边是字符串,则会变为字符串拼接
   - 有两边， 一边是对象，按照Symbol.toPrimitive -> valueOf ->toString  处理，变为字符串后，就直接按照字符串拼接处理了
-    - 特殊情况：`{} + 10` -> 10 {}会被认为是代码块处理的只是+10这个操作
+    
+    - 特殊情况：`{} + 10` -> 10 {}会被认为是代码块，处理的只是+10这个操作
   - +只出现在左边 eg: +[val] 这是把val转换为数字   ++i(先累加在运算) & i++(先运算再累加)
   - ```js
     let result = 100 + true + 21.2 + null + undefined + 'Tencent' + [] + null + 9 + false;
@@ -286,7 +287,7 @@ Object.defineProperty(window, 'a', {
   }
 })
 */
-``` 
+```
 ## 6. JS'骚'操作之0.1 + 0.2 !== 0.3
 - 十进制转换为二进制的计算 [val].toString(2)   // 参数是进制 范围 2~36
   - 整数部分 除二取余
@@ -319,5 +320,26 @@ const decimal2binary = function decimal2binary(decimal){
   }
   return `${negative?'-':''}${binary.join('')}`     
 }
+// 浮点数在计算机底层存储的时候，存储的二进制值可能被舍掉一部分【因为最多只有64位】，所以本身和原来的十进制就不一样了“精准度问题”
+// '0011111110111001100110011001100110011001100110011001100110011010'  0.1
+// '0011111111001001100110011001100110011001100110011001100110011010'  0.2
+//  0.1 + 0.2 计算机底层会根据其二进制进行处理，最后转换为十进制给浏览器，这样也是一个很长的值 例如：可能是这样的 0.3000000000000400000000... 但是浏览器也会存在长度的限制，会截掉一部分；最后面全是零的省略掉...
 
+// 解决方案：乘以一定的系数，变为整数进行运算，运算的结果再除以系数
+// console.log(((0.1 * 10) + (0.2 * 10)) / 10 === 0.3); //=>true
+// 获取系数
+const coefficient = function coefficient(num){
+  num = num + ''
+  let [, char = ''] = num.split('.'),
+      len = char.length;
+  return Math.pow(10, len)
+}
+// 求和操作
+const plus = function plus(num1, num2){
+  num1 = +num1
+  num2 = +num2
+  if(isNaN(num1) || isNaN(num2)) return NaN
+  let coeffic = Math.max(coefficient(num1),coefficient(num2))
+  return (num1 * coeffic + num2 * coeffic) / coeffic 
+}
 ```
