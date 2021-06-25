@@ -343,3 +343,25 @@ const plus = function plus(num1, num2){
   return (num1 * coeffic + num2 * coeffic) / coeffic 
 }
 ```
+## 7. 函数底层运行机制
+- 以下代码作为运行示例
+```js
+var x = [12, 23];
+
+function fn(y) {
+
+    y[0] = 100;
+
+    y = [100];
+
+    y[1] = 200;
+
+    console.log(y);
+
+}
+
+fn(x);
+
+console.log(x);
+```
+![](../image/函数底层运行机制.png)
