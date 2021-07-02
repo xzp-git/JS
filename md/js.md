@@ -349,19 +349,98 @@ const plus = function plus(num1, num2){
 var x = [12, 23];
 
 function fn(y) {
-
     y[0] = 100;
-
     y = [100];
-
     y[1] = 200;
-
     console.log(y);
-
 }
 
 fn(x);
-
 console.log(x);
 ```
 ![](../image/函数底层运行机制.png)
+## 8.关于this指向的题目分析
+- 以下代码作为运行示例
+```js
+var x = 3, 
+    obj = { 
+        x:5 
+    }; 
+obj.fn = (function(){ 
+    this.x *= ++x; 
+    return function (y) { 
+        this.x *= (++x) + y; 
+        console.log(x); 
+    } 
+})() 
+ 
+var fn = obj.fn; 
+obj.fn(6) 
+fn(4) 
+console.log(obj.x, x)
+```
+![](../image/THIS指向分析.png)
+## 9.关于闭包的分析
+- 1.以下代码作为运行示例
+```js
+let x = 5;
+function fn(x) {
+    return function (y) {
+        console.log(y + (++x));
+    }
+}
+let f = fn(6);
+f(7);
+fn(8)(9);
+f(10);
+console.log(x); 
+```
+![](../image/闭包的分析1.png)
+- 2. 以下代码作为运行示例
+```js
+let a = 0,
+    b = 0;
+function A(a) {
+    A = function (b) {
+        alert(a + b++);
+    };
+    alert(a++);
+}
+A(1);
+A(2);
+```
+![](../image/闭包的分析2.png)
+## 10.关于let、const、var的区别
+- 1. let VS var
+  - @1 var存在变量提升,而let不存在变量提升
+  ```js
+  console.log(x) //undefined
+  console.log(y) //Uncaught ReferenceError: Cannot access 'y' before initialization
+  var x = 12
+  let y = 13
+  // const fn = function () {}; //函数表达式（没有变量提升，只能在创建函数以下使用）；用const声明，后期不允许重构fn；「推荐」
+  ```
+  - @2 全局上下文基于var声明的变量是直接存储到GO中的(window),而let是存储到VO(G)中的，和GO没关系
+  ```js
+  var x = 12;
+  let y = 13;
+  console.log(x,y); //12 13
+  console.log(window.x, window.y)//12 undefined
+  ```
+  - @3 var允许重复声明（只不过浏览器只声明一次而已，但是词法上是允许的）；但是let在词法上，都不允许重复声明[错误发生在"词法解析阶段"]，并且不论我们基于何种方式声明过这个变量（例如：var/function再或者是一个形参...）再基于let/const声明都会报错
+  ```js
+  var x = 12
+  var x = 13
+  console.log(x); //13
+  let x = 15  //Uncaught SyntaxError: Identifier 'x' has already been declared
+  ```
+  - @4 在JS代码执行的过程中，如果大括号（排除对象和函数）中出现let/const/function/class等关键词（切记：没有var）,则大括号所在的代码块,会产生一个“私有块级上下文”！！ var不会产生块级上下文，而且块级上下文对他也没有任何的作用！！
+  ```js
+  console.log(a) //undefined
+  console.log(b)//Uncaught ReferenceError: Cannot access 'b' before initialization
+  var a = 12
+  let b = 13
+  if(1 == 1){
+    
+  }
+  ```
