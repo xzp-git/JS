@@ -441,6 +441,56 @@ A(2);
   var a = 12
   let b = 13
   if(1 == 1){
-    
+    /*
+    EC(BLOCK) 块级私有上下文
+    VO(BLOCK) 私有变量对象
+      b ----> 200
+      a ----> 100
+    作用域链:<EC(BLOCK),EC(G)> 上级上下文：是看在哪执行代码产生的块级上下文
+    初始化THIS 没有这一步 块级上下文中没有自己的THIS 用到的THIS都是上级上下文中的
+    初始化ARG 没有这一步
+    形参赋值 没有这一步
+    变脸提升 var a
+    代码执行
+    */
+    console.log(a) //12
+    console.log(b) //Uncaught ReferenceError: Cannot access 'b' before initialization
+    var a = 100
+    let b = 200
+    console.log(a) //100
+    console.log(b) //200
   }
+  console.log(a) //100
+  console.log(b) //13
   ```
+  - @5 暂时性死区
+  ```js
+  console.log(x); //Uncaught ReferenceError: x is not defined 使用未被声明的变量，结果应该是报错的
+  console.log(typeof x); //“undefined” 基于typeof检测一个未被声明的变量，结果是“undefined”，而不会报错!!
+  //-------------------------------------------------------
+  console.log(typeof x); //Uncaught ReferenceError: Cannot access 'x' before initialization
+  let x = 12;
+  ```
+- 2. let VS const
+  - let 和 const 声明的都是变量，都是要存储到当前上下文的VO/AO变量对象中的
+  - @1 let声明的变量，后续根据需求，可以改变‘变量’和‘值’之间的指针指向；而const不允许改变“变量”的指针指向；
+  ```js
+  let a = 12
+  a = 13
+  console.log(a) //13
+
+  const a = 12
+  a = 13; // Uncaught TypeError: Assignment to constant variable..
+  const obj = {
+    name: 'zhufeng'
+  };
+  obj.name = 'peixun';
+  console.log(obj); //{name:'peixun'}
+  ```
+  - @2 const 声明的变量必须要有初始值
+  ```js
+  let n
+  console.log(n) //undefined
+  const m ; //Uncaught SyntaxError: Missing initializer in const declaration
+  ```
+ 
