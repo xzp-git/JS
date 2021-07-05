@@ -493,4 +493,219 @@ A(2);
   console.log(n) //undefined
   const m ; //Uncaught SyntaxError: Missing initializer in const declaration
   ```
- 
+## 11. 关于变量提升的分析
+- 1.
+```js
+/*
+  EC(G)
+     a -----> 1
+     fn ----> 0x0000 [[scope]]:EC(G)   
+  变量提升: var a
+            function fn(){}  
+*/
+var a = 1;
+function fn(a) {
+    /*
+      EC(FN)
+      AO(FN) a ----> 1
+               ----> 0x0001  [[scope]]:EC(FN)
+               ----> 2
+      作用域链:<EC(FN),EC(G)>
+      初始化THIS:WINDOW
+      初始化ARG：{0:1,length:1}
+      变量提升：var a; function a(){}
+      形参赋值 a = 1
+      代码执行
+    */
+    console.log(a); // function a(){}
+    var a = 2;
+    function a() {}
+    console.log(a); //2
+}
+fn(a); 
+console.log(a); //1 
+```
+- 2.
+```js
+/*
+EC(G)
+变量提升：var a 
+          function fn(){}  [[scope]]:EC(G) 0X0001
+
+*/
+console.log(a); //=>undefined
+var a=12; 
+function fn(){
+  /*
+  EC(FN)
+
+  AO(FN) a ---> 13
+  作用域链:<EC(FN),EC(G)>
+  变量提升: a 
+  */
+    console.log(a); //=>undefined
+    var a=13;   
+}
+fn();   
+console.log(a); //=>12 
+```
+- 3.
+```js
+/*
+EC(G)
+VO(G)    a ---> 12
+           ---> 13   
+变量提升 a 
+        fn ---> 0x0000 [[scope]]:EC(G)
+*/
+console.log(a); //=>undefined
+var a=12;
+function fn(){
+    /*
+
+    EC(FN)
+
+    AO(FN)
+
+    作用域链 <EC(FN),EC(G)>
+
+    */
+    console.log(a); //=>12
+    a=13;
+}
+fn();
+console.log(a); // 13
+```
+- 4.
+```js
+/*
+EC(G)
+
+VO(G)   fn --=>  0x0000 [[scope]]:EC(G)
+变量提升  function fn() {}  0x0000 [[scope]]:EC(G)
+*/
+console.log(a); //=>报错 Uncaught ReferenceError: a is not defined
+a=12;
+function fn(){
+    console.log(a);
+    a=13;   
+}
+fn();
+console.log(a); 
+```
+- 5.
+```js
+/*
+EC(G)
+
+VO(G) foo ---> 'hello'
+
+*/
+var foo = 'hello';
+(function (foo) {
+    /*
+    自执行函数执行和创建 一起执行
+    EC(AN)
+
+    AO(AN)
+    作用域链<EC(AN),EC(G)>
+    形参赋值：foo = 'hello'
+    变量提升:var foo
+
+    */    
+    console.log(foo); //=>'hello'
+    var foo = foo || 'world';
+    console.log(foo); //=>'hello'
+})(foo); //(function(foo){...})('hello')
+console.log(foo); //=>'hello'
+```
+- 6. 函数是个渣男
+
+```js
+console.log(foo); //undefined
+{
+    console.log(foo); //函数
+    function foo() {}
+    console.log(foo); //函数
+    foo = 1;
+    console.log(foo); //1
+}
+console.log(foo); //函数 
+```
+![](../image/关于函数的变量提升.jpg)
+
+```js
+console.log(foo); //undefined
+{
+    console.log(foo); // 函数 2
+    function foo() {1} //将这行代码之前对foo的操作 给 全局 foo 同步为 函数2
+    console.log(foo)  // 函数2
+    foo = 1;
+    console.log(foo); // 1
+    function foo() {2} // 将这行代码之前对foo的操作 给 全局foo同步一份  foo = 1
+    console.log(foo);  // 1
+}
+console.log(foo); // 1
+```
+
+```js
+console.log(foo) //undefined
+{
+    function foo() {} // 将这行代码之前对foo 做的操作 同步一份给全局的foo  foo => 函数 foo
+    foo = 1; 
+    function foo() {} // 将这行代码之前对foo 做的操作 同步一份给全局的foo  foo => 1
+    foo = 2;
+}
+console.log(foo); // 1
+```
+- 7. 函数形参赋值默认值
+```js
+
+var x = 1;
+function func(x, y = function(){x = 2}){
+    
+    var x = 3; 
+    y(); 
+    console.log(x); 
+}
+func(5);
+console.log(x); 
+```
+![](../image/函数形参赋值默认值.jpg)
+
+```js
+/*
+EC(G)
+
+
+VO(G)/GO
+          x ---> 1
+          func ---> 0x0000 [[scope]]:EC(G)
+               
+变量提升：var x;   function func(x, y=...){}
+*/
+var x = 1;
+/*
+EC(FUNC)    
+    x --> 2
+    y ---> 0x0001 [[scope]]:EC(FUNC)
+    作用域链:<EC(FUNC),EC(G)>
+    形参赋值： x=5 y=小函数（形参默认值）
+    变量提升：---
+*/ 
+function func(x, y = function(){x = 2}){
+    /*
+    EC(B)
+    VO(B)
+      作用域链<EC(B),EC(FUNC)>
+      x = 3 x不是块级上下文中的 向上查找修改 func中的 x 为 3
+    */
+    x = 3; 
+    y(); //调用y 修改修改 func中的 x 为 2
+    console.log(x); // 2
+}
+func(5);
+console.log(x);//1
+
+
+```
