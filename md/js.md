@@ -709,3 +709,87 @@ console.log(x);//1
 
 
 ```
+## 12. 关于闭包作用域的分析
+- 1. ARG和形参的映射机制「非严格模式」
+```js
+/*
+EC(G)
+
+VO(G)
+   a ----> 4
+     ----> undefined
+   b ----> 0x0000 [[scope]]:EC(G)
+变量提升：
+   var a
+   function b(x, y, z) {...}
+*/
+var a = 4;
+function b(x, y, a) {
+    "use strict";
+    /*
+    EC(B)
+     
+    AO(B)
+      x -->
+    作用域链:<EC(B),EC(G)>
+    初始化ARG：{0:1, 1:2, 2:3(10), length:3} 类数组集合，实参集合
+    形参赋值： x=1 y=2 a=3
+        特殊性 在非严格模式下，初始化ARG和形参赋值后，会建立一个映射机制：但是在严格模式下是不存在的
+    变量提升：--
+    */
+    console.log(a); //=>3
+    arguments[2] = 10;
+    console.log(a); //=>10 严格模式下还是3
+}
+a = b(1, 2, 3);
+console.log(a); // undefined
+```
+- 2. 
+```js
+/*
+EC(G)
+
+VO(G)
+ test ---> 0x0001 [[scope:EC(G)]]
+变量提升：var test
+*/
+var test = (function (i) {
+    /*
+    自执行函数执行EC(AN)
+     i--->2
+    作用域链 <EC(AN),EC(G)>
+    形参赋值：i --> 2
+    变量提升
+    */
+    return function () {
+       /*
+       EC(AN)
+
+       AO(AN)
+       
+       作用域链<EC(TEST),EC(AN)>
+       初始化ARG:{0:5,length:1}
+       形参赋值：--
+       变量提升：--
+       */
+        
+        alert(i *= 2); //i=i*2 =>"4"
+    } // return 0x0002 [[scope]]:EC(AN)
+})(2);
+test(5); 
+```
+- 3. 
+```js
+var x = 4;
+function func() {
+    return function(y) {
+        console.log(y + (--x));
+    }
+}
+var f = func(5);
+f(6);
+func(7)(8);
+f(9);
+console.log(x);
+```
+![](../image/闭包作用域1.png)
