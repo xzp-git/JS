@@ -793,3 +793,19 @@ f(9);
 console.log(x);
 ```
 ![](../image/闭包作用域1.png)
+- 5.
+```js
+var x = 5,
+    y = 6;
+function func() {
+    x += y;
+    func = function (y) {
+        console.log(y + (--x));
+    };
+    console.log(x, y);
+}
+func(4);
+func(3);
+console.log(x, y);
+```
+![](../image/闭包作用域2.png)
