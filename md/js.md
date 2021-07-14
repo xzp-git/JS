@@ -360,6 +360,18 @@ console.log(x);
 ```
 ![](../image/函数底层运行机制.png)
 ## 8.关于this指向的题目分析
++ 1. 给元素的某个事件行为绑定方法【DOM0 & DOM2】，当事件行为触发，方法执行，方法中的this是当前元素本身
+```js
+box.onclick = function(){};
+box.addEventListener('click',function(){})
+
+// IE 6~8
+box.attachEvent('onclick',function(){}) //方法执行里面的this是window
+```
++ 2. 函数执行，看前面是否有点'.'
+  - @1 有点 '.'前面是谁，this就是谁
+  - @2 没有点 方法中的this是window（非严格模式）/undefined(严格模式)
++ 3. 箭头函数中没有自己的this，箭头函数执行,没有初始化this这个步骤，用到的this都是其上级上下文中的this
 - 以下代码作为运行示例
 ```js
 var x = 3, 
@@ -380,6 +392,27 @@ fn(4)
 console.log(obj.x, x)
 ```
 ![](../image/THIS指向分析.png)
+- 以下代码作为运行示例
+```js
+var num = 10;
+var obj = {
+    num: 20
+};
+obj.fn = (function (num) {
+    this.num = num * 3;
+    num++;
+    return function (n) {
+        this.num += n;
+        num++;
+        console.log(num);
+    }
+})(obj.num);
+var fn = obj.fn;
+fn(5);
+obj.fn(10);
+console.log(num, obj.num);
+```
+![](../image/this分析-1.png)
 ## 9.关于闭包的分析
 - 1.以下代码作为运行示例
 ```js
@@ -809,3 +842,18 @@ func(3);
 console.log(x, y);
 ```
 ![](../image/闭包作用域2.png)
+- 6.
+```js
+function fun(n, o) {
+    console.log(o);
+    return {
+        fun: function (m) {
+            return fun(m, n);
+        }
+    };
+}
+var c = fun(0).fun(1);
+c.fun(2);
+c.fun(3);
+```
+![](../image/闭包作用域3.png)
