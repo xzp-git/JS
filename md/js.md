@@ -1078,3 +1078,115 @@ for (; i < 3; i++) {
     }, i * 1000, i);
 }
 ```
+## 13. 闭包进阶之:柯里化函数
+- 迭代方法:`forEach map reduce reduceRight find findIndex filter some exery... MDN`
+- `reduce`数组的迭代方法,它支持结果的累积,因为在下一轮迭代可以拿到上一轮迭代的返回结果
+```js
+let arr = [1, 2, 3, 4]
+let total = arr.reduce((result, item, index) => {
+  // 数组从第二项开始迭代
+  // 第一轮 result数组第一项1 item数组第二项2 index是第二项的索引1
+  // 第二轮 result存储的是上一轮返回的结果3  item=3 index=2
+  // 第三轮 result=6 item=4 index=3 
+
+  return result + item
+})
+
+let total = arr.reduce((result, item) => {
+  // 传递的第二项是给result设置的初始值   item从数组的第一项开始迭代
+  return result + item 
+},0)
+```
+- 柯里化函数思想
+> 预先存储(预处理),利用闭包的"保存机制",我们把一些值事先存储起来,供其下级上下文中后期使用.
+```js
+const fn = (...params) => {
+  return (...arg) => {
+    params = params.concat(arg)
+    return params.reduce((result, item) => result + item)
+  }
+}
+let res = f(1,2)(3)
+console.log(res) //6   1+2+3=6
+```
+> 基于console.log或alert输出一个函数:会默认先把函数转化为了字符串[Symbol.toPrimitive -> valueOf -> toString],然后再输出[只不过浏览器为了让开发者知道这是个函数字符串,所以在输出的字符串前面,加了一个"f"]
+```js
+const fn = function(){
+  // ...
+}
+fn[Symbol.toPrimitive] = function () {
+  console.log('ok')
+  return 'zhufeng'
+}
+console.log(fn)
+
+// 函数柯里化后的求和
+const curring = function curring(){
+  let params = []
+  const add = (...args) => {
+    params = params.concat(args)
+    return add
+  }
+  add[Symbol.toPrimitive] = () => params.reduce((result, item) => result + item)
+  return add
+}
+
+let add = curring()
+
+let res = add(1)(2)(3)
+
+console.log(res) // 6
+```
+- lodash中的柯里化函数
+  - 功能:创建一个函数,该函数接受一个或者多个func的参数,如果func所需要的参数都被提供则执行func并返回执行的结果.否则继续返回该函数并等待接收剩余的参数.
+  - 参数: 需要柯里化的函数
+  - 返回值: 柯里化后的函数
+  ```js
+  const _ = require('lodash')
+
+  function getSum(a, b, c){
+    return a + b + c
+  }
+  const curried = _.curry(getSum)
+  let curried1 = curried(1, 2)
+  console.log(curried1(7))
+  ```
+  - 原理实现
+  ```js
+  function curry (func){
+    return function curriedFn(...args){
+      //判断传入的参数 与传入的函数的形参个数是否相同
+      if(args.lenght < func.length){
+        return function(){
+          return curriedFn(...args,...arguments)
+        }
+      }
+      return func(...args)
+    }
+  }
+  ```
+- 函数组合及其实现
+```js
+// 在函数式编程当中有一个很重要的概念就是函数组合， 实际上就是把处理数据的函数像管道一样连接起来， 然后让数据穿过管道得到最终的结果。 例如：
+    const add1 = (x) => x + 1;
+    const mul3 = (x) => x * 3;
+    const div2 = (x) => x / 2;
+    div2(mul3(add1(add1(0)))); //=>3
+
+    // 而这样的写法可读性明显太差了，我们可以构建一个compose函数，它接受任意多个函数作为参数（这些函数都只接受一个参数），然后compose返回的也是一个函数，达到以下的效果：
+    const operate = compose(div2, mul3, add1, add1)
+    operate(0) //=>相当于div2(mul3(add1(add1(0)))) 
+    operate(2) //=>相当于div2(mul3(add1(add1(2))))
+
+    // 简而言之：compose可以把类似于f(g(h(x)))这种写法简化成compose(f, g, h)(x)，请你完成 compose函数的编写 
+    const compose = function compose(...funcs){
+      let len = funcs.length
+      if (len === 0) return x => x
+      if (len === 1) return funcs[0]
+      return function operate(x){
+        return funcs.reduceRight((result, func) => {
+          return func(result)
+        },x)
+      }
+    }
+```

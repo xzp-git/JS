@@ -1,0 +1,159 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    .header {
+      height: 40px;
+      background: lightblue;
+    }
+
+    .footer {
+      height: 100px;
+      background: lightcoral;
+    }
+
+    .center {
+      width: 100%;
+      height: 500px;
+      background: lightgray;
+      float: left;
+    }
+
+    .left {
+      width: 200px;
+      height: 500px;
+      background: lightpink;
+      float: left;
+      margin-left: -100%;
+      position: relative;
+    left: -200px;
+    }
+
+    .right {
+      width: 300px;
+      height: 500px;
+      background: lightgreen;
+      float: left;
+      margin-left: -300px;
+      position: relative;
+      right: -300px;
+
+    }
+
+    .clearfix::after {
+      content: "";
+      display: block;
+      clear: both;
+    }
+
+    .main {
+      margin-left: 200px;
+      margin-right: 300px;
+
+    }
+  </style>
+</head>
+
+<body>
+  <.!--圣杯布局  --.>
+  <div class="header">头部</div>
+  <div class="main clearfix">
+    <div class="center">中间自适应</div> 因为相对来说，center中为主要内容，所以写前边，这样也有利于SEO
+    <div class="left">左列定宽</div>
+    <div class="right">右列定宽</div>
+  </div>
+  <div class="footer">底部</div>
+</body>
+
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    .header {
+      height: 40px;
+      background: lightblue;
+    }
+
+    .footer {
+      height: 100px;
+      background: lightcoral;
+    }
+
+    .center {
+      width: 100%;
+      height: 500px;
+      background: lightgray;
+      float: left;
+    }
+
+    .left {
+      width: 200px;
+      height: 500px;
+      background: lightpink;
+      float: left;
+      margin-left: -100%;
+      position: relative;
+    left: -200px;
+    }
+
+    .right {
+      width: 300px;
+      height: 500px;
+      background: lightgreen;
+      float: left;
+      margin-left: -300px;
+      position: relative;
+      right: -300px;
+
+    }
+
+    .clearfix::after {
+      content: "";
+      display: block;
+      clear: both;
+    }
+
+    .main {
+      margin-left: 200px;
+      margin-right: 300px;
+
+    }
+    .inner {
+      /* 为了突出显示 inner 元素，给它加上了 height 和 border 以及 上margin */
+      height: 300px;
+      border: 1px solid red;
+      margin-top: 10px;
+
+      /* 以下是设置的 margin */
+      margin-left: 200px;
+      margin-right: 300px;
+    }
+
+  </style>
+</head>
+
+<body>
+  <div class="header">头部</div>
+  <div class="main clearfix">
+    <div class="center">
+      <div class="inner">
+        中间自适应
+      </div>
+    </div> <!-- 因为相对来说，center中为主要内容，所以写前边，这样也有利于SEO -->
+    <div class="left">左列定宽</div>
+    <div class="right">右列定宽</div>
+  </div>
+  <div class="footer">底部</div>
+</body>
+
+</html>
