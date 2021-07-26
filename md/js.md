@@ -1190,3 +1190,340 @@ console.log(res) // 6
       }
     }
 ```
+## 14. JS高阶编程技巧：惰性思想
+```js
+// 惰性思想：懒，能够执行一遍的，绝不会执行第二遍[性能优化]
+//  - getComputedStyle([Element])[ATTR] 获取当前元素所有经过浏览器计算的样式
+//  - [Element].currentStyle[ATTR] IE6-8
+let getCss = function getCss(ele, attr) {
+    if ('getComputedStyle' in window) {
+        return window.getComputedStyle(ele)[attr];
+    }
+    return ele.currentStyle[attr];
+};
+console.log(getCss(box, 'width'));
+console.log(getCss(box, 'padding'));
+console.log(getCss(box, 'display')); 
+// 以上代码的弊端 第一次执行，需要校验一下兼容性；但是后续每一次执行，都需要重新校验“这个操作是多余的”...
+
+// 优化
+let getCss = function(ele,attr){
+  if('getComputedStyle' in window){
+    getCss = function(ele,attr){
+      return window.getComputedStyle(ele)[attr]
+    }
+  }else{
+    getCss = function (ele, attr) {
+      return ele.currentStyle[attr]
+    }
+  }
+  return getCss(ele, attr)
+}
+console.log(getCss(box, 'width'));
+console.log(getCss(box, 'padding'));
+console.log(getCss(box, 'display'));
+```
+## 15. 闭包进阶之:单例设计模式 & 模块化编程思想
+模块化编程历史[当代前端开发，都是模块化编程，优点：公用性&复用性、提高开发效率、方便管理、团队协作开发...]
+- @1. 高级单例设计模式[闭包+对象] 局限性：根据模块之间的依赖，需要明确导入顺序。
+```js
+// 闭包的作用：保护
+(function () {
+    let name = 'foo';
+    let age = 85;
+    let GF = false;
+})();
+(function () {
+    let name = 'bar';
+    let age = 165;
+    let GF = true;
+})();
+// 基于对象进行分组，每一个对象都是Object这个类的实例 --> “单例设计模式”，设计模式都是一种思想，用来解决一个问题：基于单独的实例，来实现信息分组，这样可以避免全局变量的污染
+//   + person1/person2 可以被称之为“命名空间”
+//   + 把描述同一个事物的属性和方法放在相同的命名空间下
+let person1 = {
+    name: 'foo',
+    age: 81,
+    GF: false
+};
+
+let person2 = {
+    name: 'bar',
+    age: 19,
+    GF: true
+}; 
+
+
+// 新闻板块
+let newsModule = (function () {
+    let time = new Date();
+    const query = function query() {
+        // ...
+    };
+    const handle = function handle() {
+        // ...
+    };
+
+    // 把供其它板块调用的方法，暴露到全局对象上「局限：暴露的内容比较多，则还会引发全局变量冲突」
+    // window.query = query;
+
+    // 通过 返回一个对象来暴露API
+    return {
+        // query:query
+        query,
+        handle
+    };
+})();
+
+// 皮肤板块
+let skinModule = (function () {
+    let time = '2021-05-03';
+    const handle = function handle() {
+        // ...
+    };
+    newsModule.query();
+
+    return {
+        handle
+    };
+})(); 
+```
+- @2. AMD 按需加载(require.js) 局限：所有的依赖都是需要提前导入的
+  - require.js的用法
+  目录结构
+  ![](../image/amdMulu.png)
+  - main.js
+  ```js
+    //全局配置
+    require.config({
+        baseUrl: 'js/lib',
+    });
+    
+    //导入模块 A B
+    require(['moduleB', 'moduleA'], function (moduleB, moduleA) {
+        console.log(moduleB.average(10, 20, 30, 40, 50));
+    });
+  ```
+  - moduleA.js
+  ```js
+    define(function () {
+      return {
+          // 任意数求和
+          sum(...args) {
+              let len = args.length,
+                  firstItem = args[0];
+              if (len === 0) return 0;
+              if (len === 1) return firstItem;
+              return args.reduce((total, item) => {
+                    return total + item;
+                });
+            }
+        };
+    });
+  ```
+  - moduleB.js
+  ```js
+    define(['moduleA'], function (moudleA) {
+      return {
+          // 求平均数（去掉最大最小值）
+          average(...args) {
+              let len = args.length,
+                  firstItem = args[0];
+              if (len === 0) return 0;
+              if (len === 1) return firstItem;
+              args.sort((a, b) => a - b);
+                args.pop();
+                args.shift();
+                return (moudleA.sum(...args) / args.length).toFixed(2);
+            }
+        };
+    });
+  ```
+  - 自己实现一套简易的AMD模块机制
+  ```js
+    let factories = {}
+    function define(moduleName,factory){
+      factories[moduleName] = factory
+    }
+    function require(modules, callback){
+      modules = modules.map(function (item) {
+        let factory = factories[item]
+        return factory()
+      })
+      callback(...modules);
+    }
+    /* 使用AMD */
+    define('moduleA',function(){
+      return {
+        fn(){
+          console.log('moduleA')
+        }
+      }
+    })
+    define('moduleB',function(){
+      return{
+        fn(){
+          console.log('moduleB')
+        }
+      }
+    })
+    require(['moduleA','moduleB'], function(moduleA,moduleB){
+      moduleB.fn()
+      moduleA.fn()
+    })
+  ```
+- @3 CMD(sea.js) & CommonJS规范(Node.js)  问题：客户端浏览器不支持CommonJS规范；当代打包工具webpack是支持CommonJS规范的，最后按照CommonJS把各个模块进行打包，编译为浏览器可以支持的代码「webpack本身是基于node环境运行的，基于webpack打包后的代码，是webpack自己实现了一套CMD规范」！！
+- @4 ES6Module模块规范   特点：webpack中也支持、浏览器中也可以直接支持
+
+- JQ部分源码[JQ虽然已经不属于这个时代了，但是其中一些优秀的思想仍然是值得我们学习的。]
+```js
+var g = typeof window !== "undefined" ? window : this
+var factory = function factory(window, noGlobal){
+  //webpack: window --> window noGlobal --> true
+  //浏览器(webiew): window --> window noGlobal --> undefined
+  "use strict" //开启严格模式
+  var version = "3.6.0"
+      jQuery = function (selector, context){
+        return new jQuery.fn.init(selector,context)
+      }
+      // ======冲突处理
+      // 场景
+      //    <script src='zepto.js'></script>
+      //        window.$=Zepto;
+      //    <script src='jquery.js'></script>
+      //        var _$=window.$;  // _$===Zepto
+      //        jQuery.noConflict = function (deep) {}
+      // 
+      //        window.$=jQuery;
+      // JQ抢了Zepto对$的使用权，此时需要转让使用权 let jj=$.noConflict()，后期 jj 代表的是就是JQ
+      var _jQuery = window.jQuery,
+          _$ = window.$
+      jQuery.noConflict = function(deep){
+        if(window.$ === jQuery) {
+          window.$ = _$
+        }
+        if(deep && window.jQuery === jQuery){
+          window.jQuery = _jQuery
+        }
+        return jQuery
+      }
+
+      //===============导出API
+      // 让其支持AMD模块规范
+      if(typeof define === "function" && define.amd){
+        define("jQuery",[],function(){
+
+        })
+      }
+      // 如果直接在浏览器（webview）中基于<script src='jquery.js'> 导入的JQ，我们在全局对象中暴露 “jQuery | $”
+      if(typeof noGlobal === "undefined"){
+        window.jQuery = window.$ = jQuery
+      }
+}
+
+
+(function(global, factory){
+  //浏览器(webview & webpack):global --> window
+  //Node环境：global --> global/模块
+  "use strict"
+  if(typeof module === "object" && typeof module.ecports === "object"){
+    //当前环境支持CommonJS规范 NODE & webpack
+    module.exports = global.document ?
+    // global --> window 说明是运行在webpack环境中的
+    factory(global, true) :
+    // 说明在Node环境下运行"JQ不支持Node环境下运行"
+    function(w){
+      if(!w.document){
+        throw new Error("jQuery requires a window with a document")
+      }
+       return factory(w);
+    }
+  } else {
+    // 浏览器(webview)
+    factory(global);
+  }
+})(g,factory)
+```
+## 16. 手撕函数的防抖和节流
+- 函数防抖
+> (debounce)在用户频繁触发某个行为的时候，我们只识别一次即可[开始边界：第一次点击触发 结束边界：等到最后一次触发]
+```js
+
+//<button id="submit" ></button>
+let submit = document.querySelector("#submit")
+
+//模拟从服务器获取数据（需要1000ms）
+const queryData = callback => {
+  setTimeout(function(){
+    callback('OK')
+  },1000)
+}
+
+/*
+  debounce:函数防抖
+  @params 
+    func:自己最终要执行的任务
+    wait:多久操作一次算是频繁触发[默认值：500ms]
+    immediate:控制触发的边界[默认值：false结束边界  true开始边界]
+  @return
+    operate处理函数，处理函数会在频繁触发的时候，频繁执行，函数内部，控制我们想要操作的func只执行一次
+*/
+const clearTimer = function clearTimer(timer){
+  if(timer){
+    clearTimeout(timer)
+  }
+  return null
+}
+
+const debounce = function debounce(func,wait,immediate){
+  if(typeof func !== "function") throw new TypeError('func must be an function!')
+  if(typeof wait === "boolean") immediate = wait
+  if(typeof wait !== "number") wait = 500
+  if(typeof immediate !== "boolean") immediate = false
+  let timer = null
+  return function operate(...params){
+    let now = !timer && immediate,
+        result
+    timer = clearTimer(timer)
+    timer = setTimeout(() => {
+      timer = clearTimer(timer)
+      //结束边界触发
+      if(!immediate) func.call(this, ...params)
+    },wait)
+    //开始边界触发
+    if(now) result = func.call(this, ...params)
+    return result   
+  }
+}
+
+submit.onclick=debounce(queryData,false)
+```
+- 函数节流
+> (throttle)在频繁操作的时候，我们能降低触发的频率 (执行的频率自己来设定)
+```js
+const throttle = function throttle(func,wait){
+  if(typeof func !== "function") throw new TypeError('func must be an function')
+  if(typeof wait !== "nummber") wait = 500
+  let timer = null,
+      previous = 0;
+  return function operate(...params){
+    let now = +new Date(),
+        remaining = wait - (now - previous),
+        result;
+    if(remaining <= 0){
+      // 两次间隔时间超过500ms了，让其方法立即执行
+      timer = clearTimer(timer);
+      result = func.call(this, ...params)
+      previous = +new Date()
+    }else if(!timer){
+      // 没设置过定时器等待，则我们设置一个去等待即可
+      timer = setTimeout(() => {
+        timer = clearTimer(timer);
+        func.call(this, ...params);
+        previous = +new Date();
+      },remaining)
+    }
+    return result;
+  }
+}
+```
