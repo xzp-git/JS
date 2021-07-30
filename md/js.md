@@ -1527,3 +1527,279 @@ const throttle = function throttle(func,wait){
   }
 }
 ```
+## 17. 图片延迟加载的N种实现方案
+- 基于JS 盒模型实现的懒加载方案
+![](../image/imglazyLoad.png)
+```html
+  <div class="container clearfix">
+		<div class="column">
+			<!-- <div class="card">
+				<a href="#">
+					<div class="lazyImageBox">
+						<img src="" alt="" data-img="images/1.jpg">
+					</div>
+					<p>泰勒·斯威夫特（Taylor Swift），1989年12月13日出生于美国宾州，美国歌手、演员。2006年出道，同年发行专辑《泰勒·斯威夫特》，该专辑获得美国唱片业协会的白金唱片认证</p>
+				</a>
+			</div> -->
+		</div>
+		<div class="column"></div>
+		<div class="column"></div>
+	</div>
+	<div class="loadingBox"></div>
+
+	<!-- IMPORT JS -->
+	<script src="lib/utils.js"></script>
+	<script src="index.js"></script>
+```
+```js
+let imageModule = (function(){
+  let columns = Array.from(document.querySelectorAll('.column')),lazyImageBoxs
+  // 数据绑定
+  const bindHTML = function bindHTML(data){
+    //计算真实渲染的高度
+    data = data.map(item => {
+      let w = item.width, h = item.height;
+      h = h / ( w/230 )
+      item.width = 230
+      item.height = h
+      return item;
+    })
+
+    // 按照三个为一组进行循环（最后一组可能不到三项）
+    for(let i=0; i<data.length; i += 3){
+      // 把三组数据按照高度排序（升序）
+      let group = data.slice(i,i+3);
+      group.sort((a,b) => a.height - b.height)
+
+      // 把三个列按照现在的高度进行排序(降序)
+      columns.sort((a,b) => b.offsetHeight - a.offsetHeight)
+
+      // 循环三个数据中的每一项：每循环一项，创建一个CARD，把创建的CARD放到对应的列中即可
+      group.forEach((item, index) => {
+        let {pic, link, title, height,} = item
+        let card = document.createElement('div');
+        card.className = "card";
+                card.innerHTML = `<a href="${link}">
+					<div class="lazyImageBox" style="height:${height}px">
+						<img src="" alt="" data-img="${pic}">
+					</div>
+					<p>${title}</p>
+        </a>`;
+        columns[index].appendChild(card);
+      })
+    }
+    // 获取所有需要延迟加载的盒子
+    lazyImageBoxs = Array.from(document.querySelectorAll('.lazyImageBox'));
+  }
+  // 单张图片加载「为了防止加载的地址有错误，我们都是临时创建一个IMG去加载地址，能加载成功，才把地址赋值给真正的IMG」
+  const singleImgLoading = function singleImgLoading(imgBox){
+    let img = imgBox.querySelector('img'),
+        trueImg = img.getAttribute('data-img'),
+        tempImg = new Image();
+    tempImg.src = trueImg
+    tempImg.onload = function(){
+      img.src = trueImg;
+      img.style.opacity = 1;
+      tempImg = null
+    }
+    imgBox.isLoad = true;
+  }
+  // 根据条件规则，控制哪些延迟加载
+  const lazyImgsFunc = function lazyImgsFunc () {
+    lazyImageBoxs.forEach(imgBox => {
+      if(imgBox.isLoad) return //处理过就不在处理
+
+      //方案一
+      let A = imgBox.offsetHeight + utils.offset(imgBox).top,
+          B = document.documentElement.clientHeight + document.documentElement.scrollTop
+          if(A <= B) singleImgLoading(imgBox) //盒子完全出现在视口中
+    })
+  } 
+  return{
+    // 模块入口：管控执行的逻辑
+    async init(){
+      let data = await utils.ajax('./data.json')
+      bindHTML(data);
+      setTimeout(lazyImgsFunc);
+      window.addEventListener('scroll', utils.throttle(lazyImgsFunc, 500));
+    }
+  }
+})()
+
+imageModule.init();
+```
+- 基于getBoundingClientRect的进阶方案
+```js
+  // 改变lazyImgFunc函数中的条件
+  // 解决方案二：getBoundingClientRect
+  let A = imgBox.getBoundingClientRect().bottom,
+      B = document.documentElement.clientHeight;
+  if (A <= B) singleImgLoading(imgBox);
+```
+- 终极方案:IntersectionObserver
+```js
+let imageModule = (function(){
+  let columns = Array.from(document.querySelectorAll('.column')),
+      loadingBox = document.querySelector('.loadingBox'),
+      lazyImageBoxs
+  
+  // 创建一个监听器：处理图片的延迟加载
+  let config = {
+    threshold:[1] //0 一露头  0.5 一半  1完全出现
+  }
+
+  let ob = new IntersectionObserver(changes => {
+      changes.forEach(item => {
+        let {
+          isIntersecting,//完全出现在视口中会变为true
+          target
+        } = item;
+        if(isIntersecting){
+          // 完全出现在视口中
+          singleImgLoading(target);
+          // 移除对当前盒子的监听
+          ob.unobserve(target)
+        }
+      })
+  },config)
+
+  // 监听到达底部
+  const watchBottom = function watchBottom() {
+    let obLoading = new IntersectionObserver(async changes => {
+        let item = changes[0];
+        if (item.isIntersecting) {
+            // 到底部了：加载更多的数据
+            let data = await utils.ajax('./data.json');
+            bindHTML(data);
+            lazyImgsFunc();
+        }
+    });
+    obLoading.observe(loadingBox);
+};
+  
+  // 数据绑定
+  const bindHTML = function bindHTML(data){
+    //计算真实渲染的高度
+    data = data.map(item => {
+      let w = item.width, h = item.height;
+      h = h / ( w/230 )
+      item.width = 230
+      item.height = h
+      return item;
+    })
+
+    // 按照三个为一组进行循环（最后一组可能不到三项）
+    for(let i=0; i<data.length; i += 3){
+      // 把三组数据按照高度排序（升序）
+      let group = data.slice(i,i+3);
+      group.sort((a,b) => a.height - b.height)
+
+      // 把三个列按照现在的高度进行排序(降序)
+      columns.sort((a,b) => b.offsetHeight - a.offsetHeight)
+
+      // 循环三个数据中的每一项：每循环一项，创建一个CARD，把创建的CARD放到对应的列中即可
+      group.forEach((item, index) => {
+        let {pic, link, title, height,} = item
+        let card = document.createElement('div');
+        card.className = "card";
+                card.innerHTML = `<a href="${link}">
+					<div class="lazyImageBox" style="height:${height}px">
+						<img src="" alt="" data-img="${pic}">
+					</div>
+					<p>${title}</p>
+        </a>`;
+        columns[index].appendChild(card);
+      })
+    }
+    // 获取所有需要延迟加载的盒子
+    lazyImageBoxs = Array.from(document.querySelectorAll('.lazyImageBox'));
+  }
+  // 单张图片加载「为了防止加载的地址有错误，我们都是临时创建一个IMG去加载地址，能加载成功，才把地址赋值给真正的IMG」
+  const singleImgLoading = function singleImgLoading(imgBox){
+    let img = imgBox.querySelector('img'),
+        trueImg = img.getAttribute('data-img'),
+        tempImg = new Image();
+    tempImg.src = trueImg
+    tempImg.onload = function(){
+      img.src = trueImg;
+      img.style.opacity = 1;
+      tempImg = null
+    }
+    imgBox.isLoad = true;
+  }
+  // 根据条件规则，控制哪些延迟加载
+  const lazyImgsFunc = function lazyImgsFunc () {
+    lazyImageBoxs.filter(imgBox =>  imgBox.getAttribute('isWatch') !== "TRUE"
+    ).forEach(imgBox => {
+
+      ob.observe(imgBox)
+      imgBox.setAttribute('isWatch', 'TRUE')
+      // if(imgBox.isLoad) return //处理过就不在处理
+      // let A = imgBox.getBoundingClientRect().bottom,
+      // B = document.documentElement.clientHeight;
+      // if (A <= B) singleImgLoading(imgBox);  
+      //方案一
+      // let A = imgBox.offsetHeight + utils.offset(imgBox).top,
+      //     B = document.documentElement.clientHeight + document.documentElement.scrollTop
+      //     if(A <= B) singleImgLoading(imgBox) //盒子完全出现在视口中
+    })
+  } 
+  return{
+    // 模块入口：管控执行的逻辑
+    async init(){
+      let data = await utils.ajax('./data.json')
+      bindHTML(data);
+      lazyImgsFunc()
+      watchBottom()
+    }
+  }
+})()
+
+imageModule.init();
+```
+- 效果图
+![](../image/imglazy.png)
+## 18. JS面向对象思想
+- 1. 什么是面向对象？
+     面向对象是一个非常伟大的“编程思想/方式”，依据 “对象、类、实例” 来构建一门语言，这样我们后期不论是学习还是开发，都应该按照 类和实例 来进行操作，这样做的好处：实例既可以具备自己独有的一些私有属性方法，也可以具备类赋予他们的公共属性和方法，私有和公有的属性方法可以进行有效的管理！！例如：一个功能，在项目中需要使用多次，此时我们需要保证，每一次使用所用到的一些信息是独立的，但是具体如何去做的一些方法，每一次都应该是公共的...  此时我们就可以创造一个类，每一次使用都是创造其一个单独的实例...「插件、UI组件、类库、框架...」
+
+     
+
+     面向对象 OOP ：javascript、java、php、python、C#(ASP.NET)、Go、Ruby...
+     面向过程 POP ：C
+
+     
+
+     对象：万物皆对象，它是一个泛指
+
+     
+
+     类：对象的一个具体细分（大类/小类、内置类/自定义类...）  类的别称“构造函数/构造器”
+
+     
+
+     实例：类中的一个具体事物
+
+- 2. JS中常见的内置类
+       数据类型相关的：一般每一种数据类型都有一个自己所属的类
+          Number:每一个数字类型的值都是他的一个实例
+          String、Boolean、Symbol、BigInt、Array、RegExp、Date、Error、Function、Object...
+
+    元素对象相关的：每一个HTML标签都有自己所属的类
+       HTMLDivElement
+       HTMLParagraphElement  ->   HTMLElement ... 
+                                                       XMLElement  -> Element ->  Node -> EventTarget -> Object    ... 
+                                                       Text(CharacterData)
+                                                        HTMLDocument -> Document  ...
+    元素集合/节点集合
+       HTMLCollection 
+       NodeList   -> Object
+       ...
+    每个实例之间都是独立的，具备一些自己的私有属性方法（所以很多人把基于面向对象方式构建的实例称之为“单例设计模式”，但是从JS本身专业角度来讲，这种方式叫做“构造函数设计模式”）；每个实例还同时具备类，其父类赋予他们的公共属性方法；
+
+-  3. 思考题：
+    document.getElementById(“元素ID”)
+      document被称之为获取的上下文[context]
+ 特点：getElementById方法的上下文只能是document   思考为啥？   
+[context].querySelector(“#元素ID”)
+    querySelector的上下文可以是任何一个DOM元素对象   思考为啥？

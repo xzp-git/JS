@@ -31,8 +31,8 @@ const debounce = function debounce(func,wait,immediate){
   if(typeof immediate !== "boolean") immediate = false
   let timer = null
   return function operate(...params){
-    let now = !timer && immediate,
-        result
+    let now = !timer && immediate
+
     timer = clearTimer(timer)
     timer = setTimeout(() => {
       timer = clearTimer(timer)
@@ -40,9 +40,42 @@ const debounce = function debounce(func,wait,immediate){
       if(!immediate) func.call(this, ...params)
     },wait)
     //开始边界触发
-    if(now) result = func.call(this, ...params)
-    return result   
+    if(now)  func.call(this, ...params)  
   }
 }
 
 submit.onclick=debounce(queryData,false)
+
+
+const throttle = function throttle(func,wait){
+  if(typeof func !== "function") throw new TypeError('func must be an function')
+  if(typeof wait !== "nummber") wait = 500
+  let timer = null,
+      previous = 0;
+  return function operate(...params){
+    let now = +new Date(),
+        remaining = wait - (now - previous),
+    if(remaining <= 0){
+      // 两次间隔时间超过500ms了，让其方法立即执行
+      timer = clearTimer(timer);
+      func.call(this, ...params)
+      previous = +new Date()
+    }else if(!timer){
+      // 没设置过定时器等待，则我们设置一个去等待即可
+      timer = setTimeout(() => {
+        timer = clearTimer(timer);
+        func.call(this, ...params);
+        previous = +new Date();
+      },remaining)
+    }
+  }
+}
+
+const handle = function handle(ev) {
+  /* queryData(result => {
+      console.log(result, ev, this);
+  }); */
+  console.log('OK', ev, this);
+};
+
+window.onscroll=throttle(handle,1000)
