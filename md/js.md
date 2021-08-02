@@ -1803,3 +1803,107 @@ imageModule.init();
  特点：getElementById方法的上下文只能是document   思考为啥？   
 [context].querySelector(“#元素ID”)
     querySelector的上下文可以是任何一个DOM元素对象   思考为啥？
+## 19. 构造函数和普通函数执行的区别
+- 以下代码作为运行示例
+```js
+function Fn(x, y) {
+    let sum = 10;
+    this.total = x + y;
+    this.say = function () {
+        console.log(`我计算的和是:${this.total}`);
+    };
+}
+// let res = Fn(10, 20); //普通函数执行
+let f1 = new Fn(10, 20); //构造函数执行
+let f2 = new Fn;
+console.log(f1.sum);
+console.log(f1.total);
+console.log(f1.say === f2.say);
+```
+![](../image/构造函数执行与普通函数执行的区别.png)
+## 20. 一个问题引出JS原型与原型链的处理机制
+- 还是上面那段代码，检测某个属性是否为对象的'私有属性'
+  - f1是Fn类的实例，也是Object这个类的实例
+  - Object.prototype.hasOwnProperty 这个方法就是用来检测私有属性的
+  ```js
+   console.log(f1.hasOwnProperty('say')); //=>true 特点：必须是它的一个私有属性才可以「有这个属性，但是不是私有的不行 & 没有这个属性更不行」
+   console.log(f1.hasOwnProperty('hasOwnProperty')); //=>false
+  ```
+- 只想检测是不是他的一个属性[不论是私有还是公有]
+  ```js
+   console.log('say' in f1); //=>true
+   console.log('hasOwnProperty' in f1); //=>true
+   console.log('sum' in f1); //=>false
+  ```
+- 需求：检测这个属性是否为他的公有属性？
+方案 -> 是它的属性，但还不能是私有的
+```js
+function hasPubProperty(obj, attr) {
+    return (attr in obj) && !obj.hasOwnProperty(attr);
+}
+console.log(hasPubProperty(f1, 'say')); //=>false
+console.log(hasPubProperty(f1, 'hasOwnProperty')); //=>true
+console.log(hasPubProperty(f1, 'sum')); //=>false
+
+// toString既是私有的，也是公有的
+f1.toString = function () {};
+console.log(hasPubProperty(f1, 'toString')); //=>false  ? */
+//对于toString这个属性来说，该如何检测呢？我们先来引出JS中原型与原型链的机制再来解决这个问题
+
+/* // instanceof：检测当前实例是否为某个类的实例
+console.log(f1 instanceof Fn); //=>true
+console.log(f1 instanceof Object); //=>true
+console.log(f1 instanceof Array); //=>false */
+```
+- JS中的原型与原型链处理机制
+  - `prototype`
+  > 大部分“函数数据类型”的值都具备“prototype（原型/显式原型）”属性，属性值本身是一个对象「浏览器会默认为其开辟一个堆内存，用来存储实例可调用的公共的属性和方法」，在浏览器默认开辟的这个堆内存中「原型对象」有一个默认的属性“constructor（构造函数/构造器）”，属性值是当前函数/类本身！！
+  - 函数数据类型
+    - 普通函数（实名或者匿名函数）
+    - 箭头函数
+    - 构造函数/类「内置类/自定义类」
+    - 生成器函数 Generator
+    - ...
+  - 不具备prototype的函数
+    - 箭头函数
+    - 基于ES6给对象某个成员赋值函数值的快捷操作
+    - ...
+  - `__proto__`
+  > 每一个“对象数据类型”的值都具备一个属性“`__proto__`（原型链/隐式原型）”，属性值指向“自己所属类的原型(prototype)”
+  - 对象数据类型值
+    - 普通对象
+    - 特殊对象：数组、正则、日期、Math、Error…
+    - 函数对象
+    - 实例对象
+    - 构造函数.prototype
+    - …
+- 以下代码作为运行示例
+```js
+function Fn() {
+    this.x = 100;
+    this.y = 200;
+    this.getX = function () {
+        console.log(this.x);
+    }
+}
+Fn.prototype.getX = function () {
+    console.log(this.x);
+};
+Fn.prototype.getY = function () {
+    console.log(this.y);
+};
+let f1 = new Fn;
+let f2 = new Fn;
+console.log(f1.getX === f2.getX);
+console.log(f1.getY === f2.getY);
+console.log(f1.__proto__.getY === Fn.prototype.getY);
+console.log(f1.__proto__.getX === f2.getX);
+console.log(f1.getX === Fn.prototype.getX);
+console.log(f1.constructor);
+console.log(Fn.prototype.__proto__.constructor);
+f1.getX();
+f1.__proto__.getX();
+f2.getY();
+Fn.prototype.getY();
+```
+![](../image/原型与原型链.png)
