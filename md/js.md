@@ -41,7 +41,7 @@
 - 特点5：typeof '未被声明的变量' -> 'undefined'
   - 插件封装中的暴露API
   - ```js
-     /*
+     /*  数据类型检测
       *  1.typeof  **
       *  2.instanceof
       *  3.constructor
@@ -53,7 +53,7 @@
       * 
       * typeof底层处理机制
       */
-
+      // 插件封装中暴露API
       // (function () {
       //     let utils = {
       //     };
@@ -292,7 +292,7 @@ Object.defineProperty(window, 'a', {
 - 十进制转换为二进制的计算 [val].toString(2)   // 参数是进制 范围 2~36
   - 整数部分 除二取余
   - 小数部分 乘二取整
-- JS使用number类型表示数字（整数和浮点数），遵循IEEE-754 标准 通过64位二进制值来表示一个数字https://babbage.cs.qc.cuny.eduIEEE-754.old/Decimal.html
+- JS使用number类型表示数字（整数和浮点数），遵循IEEE-754 标准 通过64位二进制值来表示一个数字`https://babbage.cs.qc.cuny.eduIEEE-754.old/Decimal.html`
   - 第0位：符号位，0表示正数，1表示负数 S
     第1位到第11位「11位指数」：储存指数部分 E
     第12位到第63位「52位尾数」：储存小数部分（即有效数字）F
@@ -1907,3 +1907,342 @@ f2.getY();
 Fn.prototype.getY();
 ```
 ![](../image/原型与原型链.png)
+- Function与Object在原型链中的关系
+![](../image/Function与Object在原型链中的关系.png)
+
+- 需求： `obj`之前如果是数组，我们则创建一个新的数组；如果是正则，则创建一个新的正则；如果是对象，则创建一个新的对象；..
+  - `obj.constructor`正常情况下，获取到的都是obj实列对象所属的类
+  - `let obj2 = new obj.constructor` obj2即为所需对象
+- eg:代码分析
+```js
+  function C1(name) {
+      if (name) {
+          this.name = name;
+      }
+  }
+  function C2(name) {
+      this.name = name;
+  }
+  function C3(name) {
+      this.name = name || 'join';
+  }
+  C1.prototype.name = 'Tom';
+  C2.prototype.name = 'Tom';
+  C3.prototype.name = 'Tom';
+  alert((new C1().name) + (new C2().name) + (new C3().name));
+  // 'Tom' + undefined + 'join'  => 'Tomundefinedjoin' 
+```
+- 返回到上面检测公有属性的问题
+  - 例子：hasPubProperty  不管私有是否存在，我们只看公有中是否有，只要公有中有，则当前属性就是对象的公有属性
+  - Object.getPrototypeOf(obj) 获取某个对象(实例)的原型：__proto__指向的原型对象
+```js
+Object.prototype.hasPubProperty = function hasPubProperty(attr){
+  // this -> obj 要处理的对象
+  // 找到当前对象的原型，而且一直向上找，直到找到Object.prototype为止；在查找过程中，只要某个原型对象中有ATTR这个属性，则证明这个属性就是对象的公有属性...
+  let proto = Object.getPrototypeOf(this)
+  while(proto){
+    if(proto.hasOwnProperty(attr)) return true
+    proto = Object.getPrototypeOf(proto)
+  }
+  return false
+}
+let obj = {
+  name:'obj',
+  toString(){}
+}
+obj.hasPubProperty('name') // => false
+obj.hasPubProperty('toString') // => true
+```
+## 21. `new`做了哪些事情，以及自己实现`new`
+```js
+function Dog(name) {
+    this.name = name;
+}
+Dog.prototype.bark = function () {
+    console.log('wangwang');
+};
+Dog.prototype.sayName = function () {
+    console.log('my name is ' + this.name);
+};
+
+// let sanmao = new Dog('三毛');
+// sanmao.sayName();
+// sanmao.bark();
+
+ /*
+ Ctor:构造函数 params 给构造函数传递的实参（数组）
+   - Object.create([prototype])创建一个空对象，并且让其__proto__指向[prototype]
+   - Object.create(null)创建一个不具备原型链的空对象
+ */
+
+const _new = function _new(Ctor,...params){
+  // 格式校验：函数 & 有原型对象 & 不是Symbol/BigInt
+  if(typeof Ctor !== 'function') throw new TypeError(`${Ctor} is not a constructor`)
+  let name = Ctor.name,
+      proto = Ctor.prototype
+  if(/^(Symbol|BigInt)$/i.test(name) || !proto) throw new TypeError(`${name} is not a constructor`)
+  // 创建一个当前类的实例对象
+  let obj = Object.create(Ctor.prototype)
+
+  // 把构造函数像普通函数一样执行，但是this需要指向创建的实例对象
+  let result = Ctor.call(obj,...params)
+
+  // 看函数的返回值，如果没有写返回值,或者返回的是原始值，我们默认返回实列对象；如果返回的是对象，则以自己返回的为主
+  if(result !== null && /^(object|function)$/i.test(typeof result)) return result
+  return obj
+}
+
+const _new = function _new(Ctor,...params){
+  if(typeof !== 'function') throw new TypeError(`${Ctor} is not a consturctor`)
+  let name = Ctor.name,
+      proto = Ctor.prototype,
+      obj,
+      result
+  if(/^(Symbol|BigInt)$/i.test(name) || !proto) throw new TypeError(`${name} is not a consturctor`)
+
+  obj = Object.create(Ctor.prototype)
+  result = Ctor.call(obj,...params)
+  if(result !== null && /^(object|function)$/i.test(typeof result)) return result
+  return obj
+}
+
+let sanmao = _new(Dog, '三毛');
+sanmao.bark() // => "wangwang"
+sanmao.sayName() // => "my name is 三毛"
+console.log(sanmao instanceof Dog)
+```
+- 分析以下代码
+```js
+function Foo() {
+    getName = function () {
+        console.log(1);
+    };
+    return this;
+}
+Foo.getName = function () {
+    console.log(2);
+};
+Foo.prototype.getName = function () {
+    console.log(3);
+};
+var getName = function () {
+    console.log(4);
+};
+function getName() {
+    console.log(5);
+}
+Foo.getName();
+getName();
+Foo().getName();
+getName();
+new Foo.getName();
+new Foo().getName();
+new new Foo().getName();
+```
+![](../image/new 构造函数的相关题目.png)
+## 22. JS小技巧之方法借用
+正常情况下,只有当前类的实例,才能调用所属类原型上的方法,如果我们想让其他类的实例,也使用这些方法,我们可以
+- 把需要使用的方法挂载到实例对象的私有属性上
+- 基于call改变方法执行中的this即可[要求借用方法的实例(eg:类数组)和原本方法所在类的实例(eg:数组),他们的结构要相似,这样才可以实现操作的代码的公用]
+- 我们称这种现象叫`鸭子类型`
+  - > 长得像鸭子,我们就说他是鸭子(重点是:想让他用鸭子的方法),例如:类数组借用数组方法...
+```js
+// Array.prototype.push = function push(val) {
+//   // this -> arr
+//   this[this.length] = val
+//   this.length++;
+//   return this.length
+// }
+let obj = {
+  2:3,
+  3:4,
+  length:2,
+  push:Array.prototype.push
+}
+obj.push(1) //this -> obj  obj[2] = 1 obj.length++
+obj.push(2) //this -> obj  obj[3] = 2 obj.length++
+console.log(obj) // => {2:1,3:2,length:4,push:Array.prototype.push}
+
+
+/*
+假如自己要封装一个工具类库,将传入的参数变成数组 
+ary.slice() //数组克隆
+*/
+
+let utils = (function(){
+  function toArray(){
+
+    // return Array.from(arguments);
+
+
+    // return [...arguments]
+
+
+    // let arr = [];
+    // for (let i = 0; i < arguments.length; i++) {
+    //   arr.push(arguments[i])
+    // }
+    // return arr
+
+
+    return [].slice.call(arguments)
+  }
+  return {
+    toArray
+  }
+}())
+
+let ary = utils.toArray(10, 20, 30); //=>[10,20,30]
+console.log(ary);
+ary = utils.toArray('A', 10, 20, 30); //=>['A',10,20,30]
+console.log(ary);
+```
+- queryURLParams:获取URL地址中的问号参数信息(哈希信息)
+```js
+/* 
+queryURLParams
+@ params 
+  attr:需要获取这个属性的信息(不传递获取的是所有的信息)
+@ return
+  具体某个属性信息值
+  包含所有的信息的对象
+*/
+// 思路一 借用 a 标签的属性
+String.prototype.queryURLParams = function queryURLParams(attr) {
+  // this -> url [this获取的都是其标准的对象类型实例]
+  // 把一个 实例对象 => 转换 原始值 "拆箱"
+  // 把原始值 => 实例对象 Object(原始值) "装箱"
+  attr = attr + ''
+  let obj = {},
+      link = document.createElement('a'),
+      hashIndex
+  link.href = this
+  console.dir(link)
+  let { hash, search} = link
+  hashIndex = hash.indexOf('?')
+  if(hash) obj['_HASH'] = hash.substring(1)
+  if(hash && hashIndex !== -1 && !search){
+    search = hash.substring(hashIndex) 
+    obj['_HASH'] = hash.substring(1,hashIndex)
+  } 
+  if(search) {
+    search.substring(1).split('&').forEach(item => {
+      let [key, value] = item.split("=");
+      obj[key] = value
+    })
+  }
+  if (attr !== 'undefined') return obj[attr]
+  return obj
+}
+// 思路二
+String.prototype.queryURLParams = function queryURLParams(attr) {
+  attr = attr + ''
+  let obj = {}
+  this.replace(/#([^?=&#]+)/g,(_, $1, $2) => obj['_HASH'] = $1)
+  this.replace(/([^?=&#]+)=([^?=&#]+)/g,(_, $1, $2) => obj[$1] = $2)
+  if( attr !== "undefined") return obj[attr]
+  return obj
+}
+let url = "http://www.example.com/task/index.html#/hybm/tj?task_uuid=1340514e-1a7a-4d99-a6d7-c1314f9c7f3a&census=null&include_lev=%5B1,2%5D&need_materials=2&sheng=%5B%5D"
+console.log(url.queryURLParams('task_uuid')) // => "1340514e-1a7a-4d99-a6d7-c1314f9c7f3a"
+console.log(url.queryURLParams())
+/*  =>{
+    census: "null",
+    include_lev: "%5B1,2%5D", 
+    need_materials: "2",
+    sheng: "%5B%5D"
+    task_uuid: "1340514e-1a7a-4d99-a6d7-c1314f9c7f3a",
+    _HASH: "/hybm/tj"
+  } 
+*/
+```
+- 分析以下代码
+```js
+function Fn() {
+    let a = 1;
+    this.a = a;
+}
+Fn.prototype.say = function () {
+    this.a = 2;
+}
+Fn.prototype = new Fn;
+let f1 = new Fn;​
+Fn.prototype.b = function () {
+    this.a = 3;
+};
+console.log(f1.a);
+console.log(f1.prototype);
+console.log(f1.b);
+console.log(f1.hasOwnProperty('b'));
+console.log('b' in f1);
+console.log(f1.constructor == Fn);
+```
+![](../image/原型重定向22.png)
+
+## 23. 手撕JS内置的call、apply、 bind
+### 手撕call
+```js
+const fn = function fn(x, y) {
+    console.log(this, x, y);
+    return x + y;
+};
+let obj = {
+    name: 'obj'
+};
+/* 
+fn() //this -> window
+obj.fn(); //Uncaught TypeError: obj.fn is not a function
+需求:fn执行的时候让里面的this -> obj
+fn首先基于__proto__,找到Function.prototype.call方法,把call方法执行[this->fn  第一个参数obj 其余参数:10/20]
+call 方法执行的时候,内部做了一些处理:把fn()执行,并且让fn()中的this指针,指向第一个参数(obj),并且把传递的参数10/20传递给函数,最后接收函数的返回值进行返回
+*/
+Function.prototype.call = function call(context,...params){
+  // this -> obj  context->obj  params -> [10,20]
+  if(context == null) context = window
+  if(!/^(object|function)$/i.test(typeof context)) context = Object(context)
+  let key = Symbol(),
+      result
+  context[key] = this
+  result = context[key](...params)
+  delete context[key]
+  return result
+}
+let result = fn.call('AA', 10, 20)
+cnsole.log(result)
+```
+### apply
+- `apply` 与 `bind`不同的是在于传参的时候aplly可以接收一个参数列表,改动即可
+```js
+Function.prototype.apply = function apply(context,params){
+  // this -> obj  context->obj  params -> [10,20]
+  if(context == null) context = window
+  if(!/^(object|function)$/i.test(typeof context)) context = Object(context)
+  let key = Symbol(),
+      result
+  context[key] = this
+  result = context[key](...params)
+  delete context[key]
+  return result
+}
+```
+### bind
+- `bind`和`call/apply`是不一样的,call/apply处理的时候,是可以把函数立即执行的,但是bind并不会立即执行函数,而只是预处理this和参数
+```js
+Function.prototype.bind = function bind(context,...params){
+  // this -> fn  context -> obj  params -> [10,20]
+  let self = this
+  return function (...args){
+    return self.call(context, ...params.concat(args))
+  }
+}
+const fn = function fn(x, y, ev) {
+    console.log(this, x, y, ev);
+    return x + y;
+};
+let obj = {
+    name: 'obj'
+};
+// document.body.onclick = fn; //this->body  x->事件对象  y->undefined
+// 需求：点击BODY的时候，把fn执行，但是方法中的this想改成obj，并且传递10/20
+document.body.onclick = fn.bind(obj, 10, 20);
+```
