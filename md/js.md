@@ -362,8 +362,8 @@ console.log(x);
 ## 8.关于this指向的题目分析
 + 1. 给元素的某个事件行为绑定方法【DOM0 & DOM2】，当事件行为触发，方法执行，方法中的this是当前元素本身
 ```js
-box.onclick = function(){};
-box.addEventListener('click',function(){})
+box.onclick = function(){}; //DOM0
+box.addEventListener('click',function(){}) //DOM2
 
 // IE 6~8
 box.attachEvent('onclick',function(){}) //方法执行里面的this是window
@@ -372,6 +372,7 @@ box.attachEvent('onclick',function(){}) //方法执行里面的this是window
   - @1 有点 '.'前面是谁，this就是谁
   - @2 没有点 方法中的this是window（非严格模式）/undefined(严格模式)
 + 3. 箭头函数中没有自己的this，箭头函数执行,没有初始化this这个步骤，用到的this都是其上级上下文中的this
++ 4.废话少说直接上题目
 - 以下代码作为运行示例
 ```js
 var x = 3, 
@@ -492,6 +493,7 @@ alert(window.val + json.val);
 })();
 ```
 ## 9.关于闭包的分析
+- 废话少说直接上题目
 - 1.以下代码作为运行示例
 ```js
 let x = 5;
@@ -578,9 +580,12 @@ A(2);
   ```js
   console.log(x); //Uncaught ReferenceError: x is not defined 使用未被声明的变量，结果应该是报错的
   console.log(typeof x); //“undefined” 基于typeof检测一个未被声明的变量，结果是“undefined”，而不会报错!!
+  ```
+
+
   //-------------------------------------------------------
   console.log(typeof x); //Uncaught ReferenceError: Cannot access 'x' before initialization
-  let x = 12;
+  let x = 12; //使用let 声明后在声明之前使用是会报错的
   ```
 - 2. let VS const
   - let 和 const 声明的都是变量，都是要存储到当前上下文的VO/AO变量对象中的
@@ -2045,6 +2050,7 @@ new new Foo().getName();
 - 把需要使用的方法挂载到实例对象的私有属性上
 - 基于call改变方法执行中的this即可[要求借用方法的实例(eg:类数组)和原本方法所在类的实例(eg:数组),他们的结构要相似,这样才可以实现操作的代码的公用]
 - 我们称这种现象叫`鸭子类型`
+  
   - > 长得像鸭子,我们就说他是鸭子(重点是:想让他用鸭子的方法),例如:类数组借用数组方法...
 ```js
 // Array.prototype.push = function push(val) {
@@ -2245,4 +2251,284 @@ let obj = {
 // document.body.onclick = fn; //this->body  x->事件对象  y->undefined
 // 需求：点击BODY的时候，把fn执行，但是方法中的this想改成obj，并且传递10/20
 document.body.onclick = fn.bind(obj, 10, 20);
+```
+## 24. 深度分析JS中检测数据类型的四种方法
+### No.1 typeof
+- `typeof[value]` => 检测结果是字符串，包含对应的数据类型
+  - 局限性：
+  1. `typeof null` -> `object`
+     - 为啥？typeof检测数据类型是，按照计算机底层存储的二进制值，来进行检测的，它认为以000开始的都是对象，而null全是0
+  2. `typeof`检测对象类型值，除了可执行对象（function/class）可以检测出来是`function`,其余都是`object`
+  3. `typeof`检测原始值对应的对象类型的值，结果是`object` 
+  - 优点
+    简单、性能好
+### No.2 instanceof
+- `[value] instanceof [Ctor] => true/false`本意是检测当前实例是否属于这个类
+  - 局限性：不能检测原始值类型的值[但是原始值对应对的对象格式的实例则可以检测]，但是因为原型链指向是可以肆意改动的，所以最后检测的结果不一定准确
+  - 优点：相比于`typeof`可以细分对象数据类型值[但不能因为结果是`true`,就说他是标准普通对象]
+  - 原理
+  对于上面的介绍，大家可能有些疑问，下面将介绍instanceof的原理，并且我们将自己实现一个instanceof,看完原理解析后再返回来看，相信会有收获的。
+  ```js
+  //用ES5的方式创建一个构造函数
+  function Fn(){
+
+  }
+  let f = new Fn
+  console.log(f instanceof Fn) // true
+  ```
+  对于上面的结果相信大家没有疑问，那他的原理是什么呢，看下面这张图
+  ![](../image/Symbol.hasInstance.png)
+  在我们使用`f instanceof Fn`的时候浏览器会去调用我们要检测的所属构造函数(Fn)的[Symbol.hasInstance]属性，这个属性的值是一个函数，函数的返回值决定了我们的检测结果，ES5的构造函数写法，他的Symbol.hansInstance属性是无法被直接修改，但是在ES6语法中可以被修改。
+  > 注：[Symbol.hasInstance]这个属性在`Fn.__proto__`上即`Function.prototype`上
+  ```js
+  class Fn {
+      static[Symbol.hasInstance](obj) {
+          console.log('Symbol.hasInstance  执行');
+          if (Array.isArray(obj)) return true;
+          return false;
+      }
+  }
+  let f = new Fn;
+  let arr = [1, 2, 3];
+  console.log(f instanceof Fn); //=>false
+  console.log(arr instanceof Fn); //=>true
+  ```
+  在浏览器控制台执行这段代码，我们可以看出再我们使用`instanceof`检测的时候浏览器去调用了Fn[Symbol.hasInstance]方法，而且输出的结果并不是我们预期的结果，因为可以被改动，所以检测的结果并不一定是准确的。
+  ![](../image/Es6-Symbol.hasInstance.png)
+  - 实现自己的instanceof
+  ```js
+  function Fn() {}
+  Fn.prototype = Array.prototype;
+  let f = new Fn;
+  console.log(f instanceof Array);//=>true
+  //印证了上面所说的instanceof的局限性
+
+  let arr = [10, 20, 30]; //arr.__proto__ ->  Array.prototype -> Object.prototype
+  console.log(arr instanceof Array); //=>true
+  console.log(arr instanceof RegExp); //=>false
+  console.log(arr instanceof Object); //=>true
+  console.log(new Number(1) instanceof Number); //=>true
+  console.log(1 instanceof Number); //=>false
+  /*
+  从上面的输出我们大概推测出了[Symbol.hasInstance]方法检测的原理：按照原型链检测的；只要当前检测的构造函数的原型对象，出现在实例的原型链上，则检测结果就是TRUE；如果找到Object.prototype都没有找到，则结果是FALSE；
+  */
+  //我们这个方法支持原始值类型检测
+  const my_instanceof = function my_instanceof(obj, Ctor){
+    if(Ctor == null) throw new TypeError('Right-hand side of instanceof is not an object')
+    let type = typeof Ctor
+    if(!/^(object|function)$/i.test(type)) throw new TypeError('Right-hand side of instanceof is not an object')
+    if (!/^function$/i.test(type)) throw new TypeError('Right-hand side of instanceof is not callable')
+    if (!Ctor.prototype) throw new TypeError('Function has non-object prototype in instanceof check')
+    let proto = Object.getPrototypeOf(obj)
+    while(proto){
+      if(proto === Ctor.prototype) return true;
+      proto = Object.getPrototypeOf(proto)
+    }
+    return false
+  }
+  console.log(instance_of([], Array)); //=>true
+  console.log(instance_of([], RegExp)); //=>false
+  console.log(instance_of(1, Number)); //=>true
+  console.log(instance_of(Symbol(), Symbol)); //=>true
+  console.log(instance_of([], () => {})); //报错 Function has non-object prototype in instanceof check
+  ```
+### No.3 constructor
+`constructor`的修改比`instanceof`更'肆无忌惮'
+```js
+let arr = [],
+    n = 10,
+    m = new Number(10);
+console.log(arr.constructor === Array); //=>true
+console.log(arr.constructor === RegExp); //=>false
+console.log(arr.constructor === Object); //=>false 
+// 如果CTOR结果和Object相等，说明当前可能是标准普通对象
+console.log(n.constructor === Number); //=>true
+console.log(m.constructor === Number); //=>true
+
+function Fn() {}
+let f = new Fn;
+console.log(f.constructor === Fn); //=>true
+console.log(f.constructor === Object); //=>false
+
+function Fn() {}
+Fn.prototype = {}; //重定向后丢失了constructor
+let f = new Fn;
+console.log(f.constructor === Fn); //=>false
+console.log(f.constructor === Object); //=>true 
+```
+### No.4 Object.prototype.toString.call([value]) 
+- 这是JS中唯一一个检测数据类型没有任何瑕疵的「最准确的，除了性能比typeof略微少那么一丢丢，写起来略微麻烦那么一丢丢」
+> Object.prototype.toString.call([value]) => "[object Number/String/Boolen/Null/Undefined/Symbol/BigInt/Object/Function/Array/RegExp/Date/Math/Error...]"大部分内置类的原型上都有toString方法，一般都是转换为字符串的，但是Object.prototype.toString是检测数据类型的，返回值中包含自己所属的构造函数信息...
+
+- 1.为啥要用call?
+  - ([]).toString() 调用的是Array.prototype上的toString，是转换为字符串
+  - ({}).toString() 调用的是Object.prototype上的toString，是检测数据类型的「方法中的this是谁，就是检测谁的类型」 -> 我们需要把Object.prototype.toString执行，而且还要改变其中的this    -> ({}).toString.call(10) =>“[object Number]”
+- 2.检测返回值遵循啥规则？
+  - 一般都是返回当前实例所属的构造函数信息，但是如果实例对象拥有 Symbol.toStringTag 属性，属性值是啥，最后返回的就是啥，例如：`Math[Symbol.toStringTag]="Math"  => Object.prototype.toString.call(Math)  “[object Math]”`
+  ![](../image/Object.prototype.toString.call().png)
+  ```js
+  class Fn {
+    // constructor() {
+    //     this[Symbol.toStringTag] = 'Fn';
+    // }
+    [Symbol.toStringTag] = 'Fn';
+  }
+  let f = new Fn;
+  // console.log(Object.prototype.toString.call(Fn)); //[object Function]
+  console.log(Object.prototype.toString.call(f)); //[object Fn]
+  ```
+- 3.自己封装一个检测数据类型的方法
+```js
+const checkType = function checkType(obj) {
+    if (obj == null) return obj + ""; //判断null和undefined
+    const reg = /^\[object ([a-zA-Z0-9]+)\]$/i;
+    return typeof obj === "object" || typeof obj === "function" ?
+        reg.exec(Object.prototype.toString.call(obj))[1].toLowerCase() :
+        typeof obj;
+};
+```
+## 25. Jq部分工具函数源码分析
+```js
+var getProto = Object.getPrototypeOf
+var class2type = {}
+var toString = class2type.toString // Object.prototype.toString
+var hasOwn = class2type.hasOwnProperty;//Object.prototype.hasOwnProperty
+var fnToString = hasOwn.toString//Function.prototype.toString
+var ObjectFunctionString = fnToString.call(Object) //Object.toString()  => "function Object() { [native code] }"
+
+//检测是否是一个函数
+var isFunction = function isFunction(obj){
+  return typeof obj === 'Function' && typeof obj.nodeType !== 'number' &&typeof obj.item !== 'function'
+}
+
+// 检测是否是一个window对象
+var isWindow = function isWindow(obj){
+  // window.window === window
+  return obj != null && obj === obj.window
+}
+
+// 标准的检测数据类型的办法
+// var arr = ["Boolean", "Number", "String", "Function", "Array", "Date", "RegExp", "Object", "Error", "Symbol"]
+// arr.forEach(function (name){
+//   class2type["[object " + name + "]"] = name.toLowerCase();
+// })
+
+// var toType = function toType(obj){
+//   if(obj == null) return obj + ""
+//   return typeof obj === "object" || typeof obj === "function"?
+//          class2type[toString.call(obj)] || 'object' : typeof obj
+// }
+
+// 改进
+var toType = function toType(obj){
+  if(obj == null) return obj + ""
+  var reg = /^\[object ([a-zA-Z0-9]+)\]$/i
+  return typeof obj ===  "object" || typeof obj === "function"?
+    reg.exec(toString.call(obj))[1].toLowerCase() : typeof obj
+}
+
+// 检测是否为数组或者类数组
+var isArrayLike = function isArrayLike(obj){
+  var length = !!obj && "length" in obj && obj.length,type = toType(obj)
+  if(isFunction(obj) || isWindow(obj)) return false
+  return type === "array" || length === 0 || typeof length === "number" && length > 0 && ( length - 1 ) in obj 
+}
+// 检测是否为纯粹的对象[直属类是Object || Object.create(null)]
+var isPlainObject = function isPlainObject(obj){
+  var proto,Ctor
+  if(!obj || toString.call(obj) !== "[object Object]") return false
+  proto = getProto(obj)
+  if(!proto) return true
+  Ctor = hasOwn.call(proto,"constructor") && proto.constructor
+  return typeof Ctor === "function" && fnToString.call(Ctor) ===  ObjectFunctionString
+} 
+// 检测是否是空对象
+var isEmptyObject = function isEmptyObject(obj){
+  var keys = Object.keys(obj)
+  if(typeof Symbol !== "undefined") keys = keys.concat(Object.getOwnPropertySymbols(obj))
+  return keys.length === 0
+}
+// 检测是否是数字
+var isNumeric = function isNumeric(obj){
+  var type = toType(obj)
+  return (type === "number" || type === "string") && !isNaN(obj)
+}
+```
+## 26. Jq源码再探析
+JQ是一个类库，里面提供了大量的方法供我们使用
+  - jQuery.prototype($.fn) 把JQ作为一个构造函数，为其实例提供的公共属性方法，我们可以通过“实例.xxx()”调用。
+    - 创建JQ选择器“$([selector],[context])”获取的就是JQ这个类的一个实例 -> "JQ实例对象/JQ对象"
+  - JQuery 把JQ当做一个普通对象，设置的静态私有属性方法（工具类方法）“$.xxx()”
+```js
+var arr = [];
+var slice = arr.slice;
+var push = arr.push;
+
+var jQuery = function (selector,context){
+  return new jQuery.fn.init(selector, context)
+}
+
+
+jQuery.fn = jQuery.prototype = {
+  constructor: jQuery,
+  length:0,
+  get:function(num){
+    // 索引不传递是把整个JQ对象集合变为原生的数组集合
+    if(num == null) return slice.call(this)
+    //支持负数索引
+    return num < 0 ? this[num + this.length] : this[num]
+  },
+  // 基于索引，获取JQ对象（集合）中某一项的内容，结果还是一个新的JQ实例对象
+  eq:function(i){
+    var len = this.length,
+        j = +i + (i < 0 ? len : 0);
+    return this.pushStack(j >= 0 && j < len ? [this[j]] : [])
+  },
+  pushStack: function(elems){
+    // this.constructor() -> 空的JQ实例对象
+    // 把新的空的实例对象和传递进来的数组进行合并 => ret 是JQ实例
+    var ret = jQuery.merge(this.constructor(), elems);
+    ret.prevObject = this
+    return ret
+  }
+}
+
+
+var rootjQuery,
+    rquickExpr = /^(?:\s*(<[\w\W]+>)[^>]*|#([\w-]+))$/,
+    init = jQuery.fn.init = function(selector, context, root){
+      var match, elem;
+      if(!selector) return this //selector -> ""/0/NaN/null/undefined  返回一个空JQ对象
+      root = root || rootjQuery;
+      if(typeof selector === "string"){
+        // 选择器可以是字符串
+        if(selector[0] === "<" && selector[selector.length - 1] === ">" && selector.length >= 3){
+          // 判断的是$("<div>内容</div>") 创建一个新的DOM元素（返回结果是JQ实例）
+        }else{
+          // 正常选择器的解析处理
+        }
+        // 最后返回的还是JQ实例对象
+      }else if(selector.nodeType){
+        // 选择器可以是DOM元素对象
+        // 如何把Jq对象转化成原生DOM对象
+        //   - JQ实例对象(一般都是集合，哪怕只有一项也是集合)[索引]
+        //   - JQ实例对象.get(索引)
+        this[0] = selector
+        this.length = 1
+        return this
+      }else if(isFunction(selector)){
+        // 选择器可以是函数
+        return root.ready !== undefined ?
+        //$(function(){}) => $(document).ready(function(){}) => 等待DOM结构加载完再执行
+        root.ready(selector) : selector(jQuery)
+      }
+      // 如果传递的selector既不是空，也不是字符串/DOM对象/函数，则执行makeArray方法：返回一个JQ实例对象，这个操作主要目的是为了把原生的元素集合/节点集合，变为JQ实例对象的集合
+      return jQuery.makeArray(selector, this)
+    }
+init.prototype = jQuery.fn;
+rootjQuery = jQuery(document);
+jQuery.makeArray = function makeArray(arr, results){
+  var ret = results || []
+  
+}
 ```
