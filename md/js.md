@@ -1194,6 +1194,16 @@ console.log(res) // 6
         },x)
       }
     }
+    // 课后思考：redux中的compose函数编写思想
+    /* function compose(...funcs) {
+        if (funcs.length === 0) {
+            return (arg) => arg
+        }
+        if (funcs.length === 1) {
+            return funcs[0]
+        }
+        return funcs.reduce((a, b) => (...args) => a(b(...args)))
+    } */
 ```
 ## 14. JS高阶编程技巧：惰性思想
 ```js
@@ -1485,10 +1495,10 @@ const debounce = function debounce(func,wait,immediate){
   if(typeof wait === "boolean") immediate = wait
   if(typeof wait !== "number") wait = 500
   if(typeof immediate !== "boolean") immediate = false
+
   let timer = null
   return function operate(...params){
-    let now = !timer && immediate,
-        result
+    let now = !timer && immediate
     timer = clearTimer(timer)
     timer = setTimeout(() => {
       timer = clearTimer(timer)
@@ -1496,8 +1506,7 @@ const debounce = function debounce(func,wait,immediate){
       if(!immediate) func.call(this, ...params)
     },wait)
     //开始边界触发
-    if(now) result = func.call(this, ...params)
-    return result   
+    if(now)  func.call(this, ...params)
   }
 }
 
@@ -1513,12 +1522,11 @@ const throttle = function throttle(func,wait){
       previous = 0;
   return function operate(...params){
     let now = +new Date(),
-        remaining = wait - (now - previous),
-        result;
+        remaining = wait - (now - previous)
     if(remaining <= 0){
       // 两次间隔时间超过500ms了，让其方法立即执行
       timer = clearTimer(timer);
-      result = func.call(this, ...params)
+       func.call(this, ...params)
       previous = +new Date()
     }else if(!timer){
       // 没设置过定时器等待，则我们设置一个去等待即可
@@ -1528,7 +1536,6 @@ const throttle = function throttle(func,wait){
         previous = +new Date();
       },remaining)
     }
-    return result;
   }
 }
 ```
@@ -2144,7 +2151,7 @@ String.prototype.queryURLParams = function queryURLParams(attr) {
 String.prototype.queryURLParams = function queryURLParams(attr) {
   attr = attr + ''
   let obj = {}
-  this.replace(/#([^?=&#]+)/g,(_, $1, $2) => obj['_HASH'] = $1)
+  this.replace(/#([^?=&#]+)/g,(_, $1) => obj['_HASH'] = $1)
   this.replace(/([^?=&#]+)=([^?=&#]+)/g,(_, $1, $2) => obj[$1] = $2)
   if( attr !== "undefined") return obj[attr]
   return obj
@@ -2214,7 +2221,7 @@ Function.prototype.call = function call(context,...params){
   return result
 }
 let result = fn.call('AA', 10, 20)
-cnsole.log(result)
+console.log(result)
 ```
 ### apply
 - `apply` 与 `bind`不同的是在于传参的时候aplly可以接收一个参数列表,改动即可
@@ -2331,6 +2338,26 @@ document.body.onclick = fn.bind(obj, 10, 20);
   console.log(instance_of(1, Number)); //=>true
   console.log(instance_of(Symbol(), Symbol)); //=>true
   console.log(instance_of([], () => {})); //报错 Function has non-object prototype in instanceof check
+  function instance_of(obj, Ctor) {
+      // 数据格式准确性校验
+      if (Ctor == null) throw new TypeError("Right-hand side of 'instanceof' is not an object");
+      if (typeof Ctor !== "function") throw new TypeError("Right-hand side of 'instanceof' is not callable");
+      if (!Ctor.prototype) throw new TypeError("Function has non-object prototype 'undefined' in instanceof check");
+  
+      // 原始类型直接忽略
+      if ( obj == null || !/^(object|function)$/.test(typeof obj)) return false;
+  
+      // 先检测是否有 Symbol.hasInstance 这个属性
+      if (typeof Ctor[Symbol.hasInstance] === "function") return Ctor[Symbol.hasInstance](obj);
+  
+      // 最后才会按照原型链进行处理
+      let prototype = Object.getPrototypeOf(obj);
+      while (prototype) {
+          if (prototype === Ctor.prototype) return true;
+          prototype = Object.getPrototypeOf(prototype);
+      }
+      return false;
+  }
   ```
 ### No.3 constructor
 `constructor`的修改比`instanceof`更'肆无忌惮'
@@ -2529,6 +2556,396 @@ init.prototype = jQuery.fn;
 rootjQuery = jQuery(document);
 jQuery.makeArray = function makeArray(arr, results){
   var ret = results || []
-  
+  if(arr != null){
+    // Object(arr) 如果arr是一个字符串，也会变为类数组结构
+    if(isArrayLike(Object(arr))){
+      jQuery.merge(ret, typeof arr === "string"?[arr]:arr)
+    } else {
+      push.call(ret,arr)
+    }
+  }
+  return ret
 }
+//把两个数组或者类数组进行合并(把第二个集合中的信息依次加入到第一个集合中)，最后返回的第一个集合
+jQuery.merge = function merge(first, seecond){
+  var len = +second.length,
+      j = 0,
+      i = first.length;
+  for(;j<len;j++){
+    first[i++] = second[j]
+  }
+  first.length = i
+  return first
+}
+
+//迭代数组/类数组/对象 & 支持回调函数中返回false。控制迭代结束
+jQuery.each = function each(obj, callback){
+  var length,i = 0;
+  if(isArrayLike(obj)){
+    //迭代数组和类数组
+    length = obj.length
+    for(; i<length;i++){
+      if(callback.call(obj[i], i, obj[i]) === false){
+        break
+      }
+    }
+  } else {
+    //迭代对象
+    for (i in obj){
+      if (callback.call(obj[i],i,obj[i]) === false){
+        break
+      }
+    }
+  }
+  return obj
+}
+```
+## 27. 关于对象的深浅合并与深浅拷贝
+- JQ中extend方法解读
+1. 基于extend可以向JQ对象和JQ原型对象上扩展方法（JQ插件编写）
+   `$.extend({xxx:xxx,...})  $.fn.extend({xxx:xxx,...})`
+2. 可以实现两个及多个对象的合并(类似于Object.assign),并且支持深度合并
+   `$.extend(obj1,obj2,obj3,...)` 浅合并
+   `$.extend(true,obj1,obj2,obj3,...)` 深度合并
+```js
+let obj1 = {
+    url: '/api1',
+    method: 'GET',
+    headers: {
+        'Content-Type': 'application/json'
+    }
+};
+let obj2 = {
+    url: '/api2',
+    headers: {
+        'X-Token': 'xxx'
+    }
+};
+console.log(Object.assign({}, obj1, obj2));
+// Object.assign()是基于浅比较的“浅合并”：只把第一层作比较，直接实现合并，对于第二级及以后，不会在进行深度比较的{...,headers:{'X-Token': 'xxx'}}
+
+/*
+$.extend(obj)
+$.fn.extend(obj)
+$.extend(obj1,obj2,obj3,...)
+$.extend(true,obj1,obj2,obj3,...)
+*/
+jQuery.extend = jQuery.fn.extend = function(){
+  var options, name, src, copy, copyIsArray, clone,
+      target = arguments[0] || {},
+      i = 1,
+      length = arguments.length,
+      deep = false
+  //为保证target是一个对象【第一个如果是布尔类型，是控制深浅合并的，让其赋值给deep，并且让target等于第二个实参（对象）】
+  if(typeof target === "boolean"){
+    deep = target;
+    target = arguments[i] || {}
+    i++
+  }
+
+  if(typeof target !== "object" && !isFunction(target)) target = {}
+  // 只传递了一个对象，这种情况下，为了给$/$.fn扩充方法的【也可以理解为，把传递对象中的每一项和$/$.fn进行合并】
+  if(i === length){
+    target = this;
+    i--;
+  }
+  //target是多个对象合并中，被覆盖的那个对象，我们拿其他传递的对象，一次覆盖他即可
+  for(;i < length; i++){
+    // options就是剩余传递的某个对象
+    if((options = arguments[i]) != null){
+      // 迭代options中的每一项，用其替换target中对应的项(如果target中没有这一项就是直接新加一个)
+      for(name in options){
+        copy = options[name]
+        if(name === "__proto__" || target === copy){
+          continue
+        }
+
+        // 实现深度合并
+        if(deep && copy && (jQuery.isPlainObject(copy) || (copyIsArray = Array.isArray(copy)))){
+          //src是要被替换的项 copy拿它替换src
+          src = target[name]
+          if(copyIsArray && !Array.isArray(src)){
+            clone = []
+          }else if(!copyIsArray && !jQuery.isPlainObject(src)){
+            clone = {}
+          }else{
+            clone = src
+          }
+          copyIsArray = false
+          target[name] = jQuery.extend(deep, clone, copy)
+        }else if(copy !== undefined){
+          // 浅合并
+          target[name] = copy
+        }
+      }
+    }
+  }
+  return target
+}
+
+// 实现自己的数组和对象的深浅合并
+const merge = function merge() {
+  let options,
+      target = arguments[0] || {},
+      i = 1,
+      length = arguments.length,
+      deep = false,
+      treated = arguments[length - 1]
+      // 第一次执行merge,最后一项是用来替换target的，不是用来记录谁处理过、谁没处理过的，所以我们要为其赋值一个新数组；等到后期每次递归。我们都会再最末尾把存放哪些处理过的数组传递过来，此时最后一项这个数组才不是用来替换target的 => treated.treated有这个属性的数组是专门存放哪写处理过的
+      Array.isArray(treated) && treated.treated? length--:(treated = [],treated.treated = true)
+      //如果第一个值是布尔，要把这个值给deep,让target存储的第二个传递的参数（也就是第一个对象），也就是要被替换的对象
+      if(typeof target === "boolean") {
+        deep = target;
+        target = arguments[i] || {}
+        i++
+      }
+      // 确保target是个对象
+      if(typeof target !== "object" && !isFunction(target)) target = {}
+      //循环除第一个传递的对象外，剩下的每个传递的对象
+      for(; i < length; i++){
+        options = arguments[i]
+        if(options == null) continue
+        //之前已经处理过这个对象的，就没必要在处理了；没处理过的，加入到treated处理列表中
+        if(treated.includes(options)) return options
+        treated.push(options)
+        // 循环这个对象中的每一项，用每一项的值替换target中对应项的值
+        each(options, function(copy,name){
+          let copyIsArray = Array.isArray(copy),
+              copyIsObject = isPlainObject(copy),
+              src = target[name],
+              clone = src
+              //如果某一项的值是纯粹对象或者数组，并且deep是true,我们开启深度合并
+              if(deep && copy && (copyIsArray || copyIsObject)){
+                if (copyIsArray && !Array.isArray(clone)) clone = []
+                if (copyIsObject && !isPlainObject(clone)) clone = {}
+                target[name] = merge(deep, clone, copy, treated)
+              }else if(copy !== undefined){
+                target[name] = copy
+              }
+        })
+      }
+      return target
+}
+```
+- 数组和对象的深浅克隆
+1. 浅拷贝:第一级会创建不同的堆内存，但是第二级及以后共用相同的堆内存
+   - 自己遍历一遍，把每一项和他的值赋值给新的对象
+   ```js
+   let obj2 = {}
+   utils.each(obj, (copy, name) => {
+       obj2[name] = copy;
+   });
+   ```
+   - 展开运算符 && Object.assign
+   ```js
+   let obj2 = {
+     ...obj
+   }
+   let obj2 = Object.assign({}, obj)
+   ```
+   - 如果是数组，还可以基于slice
+2. 深拷贝
+   - `JSON.stringify() & JSON.parse()`
+   局限性：
+   1. 属性值是 `undefined/Symbol/function` 这些类型的，直接会丢失
+   2. 属性值是 正则/Error实例 这些类型的，会变为空对象
+   3. 属性值是 `bigint`类型的，则直接报错了
+   4. 属性值是 Date格式的，转换为字符串后，在重新转换为对象，结果还是字符串
+   - 自己实现
+    ```js
+    const clone = function clone(){
+      let target = arguments[0],
+          deep = false,
+          type,
+          isArray,
+          isObject,
+          ctor,
+          result,
+          treated = arguments[arguments.length - 1]
+      if(typeof target === 'boolean'){
+        if(arguments.length === 1) return target
+        deep = target
+        target = arguments[1]
+      }
+      // 防止死递归
+      if(!Array.isArray(treated) || !treated.treated) {
+        treated = []
+        treated.treated = true
+      }
+      if (treated.includes(target)) return target
+      treated.push(target)
+      // 特殊值拷贝
+      type = toType(target)
+      isArray = isArrayLike(target)
+      isObject = isPlainObject(target)
+      if(target == null) return target
+      ctor = target.constructor
+      if(/^(regexp|date|error)$/i.test(type)){
+        if(type === 'error') target = target.message;
+        return new ctor(target)
+      }
+      if(/^(function|generatorfunction)$/i.test(type)){
+        return function proxy(...params){
+          return target.call(this, ...params)
+        }
+      }
+      if(!isArray && !isObject) return target
+      // 数组和对象的拷贝
+      result = isArray? []:{}
+      each(target,function(copy,name){
+        if(deep){
+          // 深拷贝
+          result[name] = clone(deep, copy,treated)
+          return
+        }
+        //浅拷贝
+        result[name] = copy
+      })
+      return result
+    }
+    ```
+## 28. JS事件循环机制
+### 进程和线程
+- 浏览器打开一个页面就相当于开一个进程，在进程中，我们会同时做很多事情，每一个事情都有一个“线程”去处理，所以一个进程中可能会包含多个线程！！
+- 浏览器是多线程的：
+  GUI渲染线程：渲染页面 & 绘制图形
+  JS引擎线程：渲染和解析JS代码
+  事件触发线程：监听事件触发
+  定时触发器线程：给定时器计时的
+  异步HTTP请求线程：基于HTTP网络从服务器端获取资源和信息
+  WebWorker
+  ...
+- 同时做多件事情是“异步编程”; 一次只能处理一件事情，上一件事情处理完，下一件才能开始处理，这种操作是“同步编程”
+  异步编程实现的机制
+  - 多线程机制
+  - EventLoop事件循环机制
+  - ...
+- JS是单线程的(浏览器只分配一个线程“JS引擎线程”用来渲染和解析JS代码)
+  - JS中的大部分代码操作都是“同步”
+  - 有少部分操作，结合Eventloop机制，实现了“异步”处理
+    [异步宏任务:macrotask]
+    - 定时器：setTimeout/setInterval
+    - 事件绑定/队列
+    - 数据请求:Ajax/Fetch
+    - MessageChannel
+    - setImmediate[NODE]
+    - ...
+    [异步微任务:microtask]
+    - Promise.then/catch/finally
+    - async/await
+    - queueMicrotask
+    - MutationObserver
+    - IntersectionObserver
+    - requestAnimationFrame
+    - process.nextTick[NODE]
+    - ...
+
+### JS事件循环解析
+
+```js
+console.log(1);
+setTimeout(() => {
+    console.log(2);
+}, 0);
+console.log(3);
+for (let i = 0; i < 99999999; i++) {} //100MS左右
+console.log(4);
+```
+![](../image/JS事件循环-1.png)
+
+```js
+setTimeout(() => {
+    console.log(1);
+}, 20);
+console.log(2);
+setTimeout(() => {
+    console.log(3);
+}, 10);
+console.log(4);
+for (let i = 0; i < 90000000; i++) {}
+console.log(5);
+setTimeout(() => {
+    console.log(6);
+}, 8);
+console.log(7);
+setTimeout(() => {
+    console.log(8);
+}, 15);
+console.log(9);
+```
+![](../image/JS事件循环-2.png)
+### promise的使用总结
+```js
+let p1 = new Promise((resolve, reject) => {
+  console.log(1)
+  resolve(100)
+  console.log(2)
+})
+console.log(p1) //fulfilled 100
+//p1.then 如果已知promise实例的状态，我们就把执行的方法onfulfilled或者onrejected放在EventQueue的异步微任务队列中等待执行[并不会立即执行方法，也即是then其实是异步的任务]
+
+
+
+
+let p2 = new Promise((resolve, reject) => {
+  setTimeout(() => {
+    resolve(100) //立即更新实例的状态和 值，但是通知之前存储的方法执行这个操作是“异步”的
+    console.log(2)
+  },1000)
+})
+console.log(p1) //pending
+//如果此时还不知道p1实例的状态，则我们会把onfulfilled/onrejected存储在一个容器中，等到后期我们基于resolve/reject把实例状态修改后，则在通知之前存放的方法执行【但是也不是立即执行，而是放在异步的微任务等待队列中】
+ p1.then(result => {
+    console.log(`成功:${result}`);
+}, reason => {
+    console.log(`失败:${reason}`);
+});
+console.log(3);
+// 3  2  成功:100 
+
+
+
+
+// 基于then返回的promise实例，它的状态和值，主要看onfulfilled/onrejected执行
+//   - 函数返回的不是promise实例：方法执行不报错，p2状态是成功，值是返回值；方法执行报错，则p2是失败的，值是报错原因
+//   - 函数返回的是个promise实例：则这个实例的状态和值决定了p2的状态和值
+
+let p1 = Promise.resolve(100);
+console.log(p1); //fulfilled
+let p2 = p1.then(result => { //p1.then的时候，此处的onfulfilled方法放在EventQueue中等待执行（@A）
+    console.log(`成功:${result}`);
+    return 1000;
+});
+console.log(p2); //pending
+p2.then(result => { //此时还不知道p2的状态，所以先把onfulfilled存储起来（@B）
+    console.log(`成功:${result}`);
+});
+console.log('SYNC END');
+//同步结束后开始执行@A -> 成功：100并且修改p2的状态是成功，值是1000；
+//此时才知道@B可以执行了，把其也放在等待的异步微任务队列中 -> 如果没有其他的异步任务执行，这把@B也拿出来执行 -> 成功：1000
+```
+### async/await使用总结
+```js
+const query = () => {
+  return new Promise(resolve => {
+    setTimeout(() => resolve(300),1000)
+  })
+}
+(async () => {
+  //如果await后面放置的不是一个Promise实例，则浏览器默认会把其转换为一个“状态为成功，值就是await后的值”的promise实例
+  //  - await需要等待后面的promise实例是状态为成功的，才会执行下面的代码
+  //  - 首先当前上下文中，await下面的代码都是异步的微任务  @aw
+  //  - 如果已经知道await后面的实例状态是成功的，则 @aw 直接放在EventQueue中，等待执行即可
+  //  - 如果后面实例状态是失败的，则 @aw 在webapi中永远不会进入到EventQueue中，因为永远不会执行
+  //  - 如果暂时还不知道是成功还是失败，则@aw 先放置在webapi中，等到知道实例状态是成功后，在挪至到EventQueue中等待执行
+  let result = await 1 //await Promise.resolve(1)
+  console.log(result);
+
+  result = await Promise.resolve(2)
+  console.log(result)
+
+  result = await querey();
+  // 先把query执行，把返回的promise实例放在await后面等着，当前案例只有1000ms后，才能知道实例状态
+})()
+
 ```
